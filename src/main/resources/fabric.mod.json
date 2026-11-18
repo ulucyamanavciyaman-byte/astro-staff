@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "astro_staff",
+  "version": "${version}",
+  "name": "Astro Staff Commands",
+  "description": "Moderator commands for Astro SMP (/mkick, /mban, /munban, /mtp, /mfreeze, /mspec, /minv ...). Staff = players the Astro datapack tags as astro_staff (MOD, ADMIN, OWNER).",
+  "authors": ["Fantonayt_REAL"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": { "main": ["astro.mod.AstroStaff"] },
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
