@@ -17,12 +17,12 @@ import java.util.regex.Pattern;
 
 /**
  * Astro Staff Commands - moderator commands for Astro SMP.
- * Who counts as staff: any player with the "astro_staff" tag. The Astro datapack gives that tag
- * every tick to the OWNER and to players on the rank_admin / rank_mod teams.
+ * Who counts as staff: players on the astro_owner, rank_admin or rank_mod teams.
  * The actual kick/ban/tp is run by the server itself, so mods do NOT need OP.
  */
 public class AstroStaff implements ModInitializer {
     private static final String STAFF_TAG = "astro_staff";
+    private static final java.util.Set<String> STAFF_TEAMS = java.util.Set.of("astro_owner", "rank_admin", "rank_mod");
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
 
     private static final SuggestionProvider<CommandSourceStack> ONLINE =
@@ -34,9 +34,15 @@ public class AstroStaff implements ModInitializer {
     }
 
     // ---------------------------------------------------------------- helpers
+    /** staff = on the astro_owner / rank_admin / rank_mod team */
+    private static boolean onStaffTeam(MinecraftServer server, ServerPlayer p) {
+        var team = server.getScoreboard().getPlayersTeam(p.getScoreboardName());
+        return team != null && STAFF_TEAMS.contains(team.getName());
+    }
+
     private static boolean isStaff(CommandSourceStack src) {
         ServerPlayer p = src.getPlayer();
-        return p == null || p.getTags().contains(STAFF_TAG); // console is always allowed
+        return p == null || onStaffTeam(src.getServer(), p); // console is always allowed
     }
 
     private static boolean deny(CommandSourceStack src) {
@@ -72,7 +78,7 @@ public class AstroStaff implements ModInitializer {
     }
 
     private static boolean protectedTarget(CommandSourceStack src, ServerPlayer target) {
-        if (target != null && target.getTags().contains(STAFF_TAG) && src.getPlayer() != null) {
+        if (target != null && onStaffTeam(src.getServer(), target) && src.getPlayer() != null) {
             src.sendFailure(Component.literal("You can't use that on another staff member."));
             return true;
         }
