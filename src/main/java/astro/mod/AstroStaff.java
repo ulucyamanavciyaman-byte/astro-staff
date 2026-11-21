@@ -14,6 +14,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.regex.Pattern;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Locale;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
 /**
  * Astro Staff Commands - moderator commands for Astro SMP.
@@ -28,9 +35,93 @@ public class AstroStaff implements ModInitializer {
     private static final SuggestionProvider<CommandSourceStack> ONLINE =
             (ctx, builder) -> SharedSuggestionProvider.suggest(ctx.getSource().getServer().getPlayerNames(), builder);
 
+    // ------------------------------------------------------------ custom spawn
+    private static final Path SPAWN_FILE = Paths.get("config", "astro_spawn.txt");
+    private static MinecraftServer SERVER;
+    /** dimension x y z yaw pitch, or null if not set */
+    private static String[] spawn = null;
+
+    private static void loadSpawn() {
+        try {
+            if (Files.exists(SPAWN_FILE)) {
+                String[] p = Files.readString(SPAWN_FILE).trim().split("\\s+");
+                if (p.length == 6) spawn = p;
+            }
+        } catch (Exception e) { spawn = null; }
+    }
+
+    private static void saveSpawn() {
+        try {
+            Files.createDirectories(SPAWN_FILE.getParent());
+            Files.writeString(SPAWN_FILE, String.join(" ", spawn));
+        } catch (Exception ignored) { }
+    }
+
+    private static String spawnTp(String target) {
+        return "execute in " + spawn[0] + " run tp " + target + " " + spawn[1] + " " + spawn[2] + " " + spawn[3] + " " + spawn[4] + " " + spawn[5];
+    }
+
+    /** "ResourceKey[minecraft:dimension / minecraft:overworld]" -> "minecraft:overworld" */
+    private static String dimId(Object key) {
+        String s = String.valueOf(key);
+        int i = s.lastIndexOf(" / ");
+        if (i >= 0) s = s.substring(i + 3);
+        return s.replace("]", "").trim();
+    }
+
+    private static boolean isOwnerOrAdmin(CommandSourceStack src) {
+        ServerPlayer p = src.getPlayer();
+        if (p == null) return true;
+        var team = src.getServer().getScoreboard().getPlayersTeam(p.getScoreboardName());
+        return team != null && (team.getName().equals("astro_owner") || team.getName().equals("rank_admin"));
+    }
+
+    private static int setSpawn(CommandContext<CommandSourceStack> c) {
+        CommandSourceStack src = c.getSource();
+        if (!isOwnerOrAdmin(src)) { src.sendFailure(Component.literal("Only the OWNER or ADMINS can set the spawn.")); return 0; }
+        ServerPlayer me = src.getPlayer();
+        if (me == null) { src.sendFailure(Component.literal("Players only.")); return 0; }
+        String dim = dimId(src.getLevel().dimension());
+        spawn = new String[]{dim,
+                String.format(Locale.ROOT, "%.3f", me.getX()), String.format(Locale.ROOT, "%.3f", me.getY()), String.format(Locale.ROOT, "%.3f", me.getZ()),
+                String.format(Locale.ROOT, "%.1f", me.getYRot()), String.format(Locale.ROOT, "%.1f", me.getXRot())};
+        saveSpawn();
+        run(src.getServer(), "execute in " + dim + " run setworldspawn " + (int) Math.floor(me.getX()) + " " + (int) Math.floor(me.getY()) + " " + (int) Math.floor(me.getZ()));
+        ok(src, "§d✦ Spawn set exactly here! §7(" + spawn[1] + ", " + spawn[2] + ", " + spawn[3] + " in " + dim + ") Everyone now respawns here and /spawn brings them here.");
+        return 1;
+    }
+
+    private static int toSpawn(CommandContext<CommandSourceStack> c) {
+        CommandSourceStack src = c.getSource();
+        ServerPlayer me = src.getPlayer();
+        if (me == null) { src.sendFailure(Component.literal("Players only.")); return 0; }
+        if (spawn == null) { src.sendFailure(Component.literal("The spawn hasn't been set yet. An admin must stand there and type /setspawn.")); return 0; }
+        run(src.getServer(), spawnTp(me.getName().getString()));
+        run(src.getServer(), "execute as " + me.getName().getString() + " at @s run playsound minecraft:entity.enderman.teleport master @s ~ ~ ~ 1 1");
+        ok(src, "§d✦ Teleported to spawn!");
+        return 1;
+    }
+
     @Override
     public void onInitialize() {
+        loadSpawn();
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> SERVER = server);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> register(dispatcher));
+        // after dying, everyone goes to the custom spawn (not after leaving the End)
+        ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
+            if (alive || spawn == null || SERVER == null) return;
+            String name = newPlayer.getName().getString();
+            SERVER.execute(() -> run(SERVER, spawnTp(name)));
+        });
+        // brand-new players start at the custom spawn
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            if (spawn == null) return;
+            String name = handler.getPlayer().getName().getString();
+            server.execute(() -> {
+                run(server, "execute as " + name + " unless entity @s[tag=astro_spawned] " + spawnTp("@s").replace("execute ", ""));
+                run(server, "tag " + name + " add astro_spawned");
+            });
+        });
     }
 
     // ---------------------------------------------------------------- helpers
@@ -195,9 +286,61 @@ public class AstroStaff implements ModInitializer {
                 "§e/mfreeze <player> §7/ §e/munfreeze <player> §7- freeze / unfreeze",
                 "§e/mspec <player> §7- see through their eyes (§e/mstop§7 to return)",
                 "§e/minv <player> §7- open a copy of their inventory",
-                "§e/sc <message> §7- staff-only chat"
+                "§e/sc <message> §7- staff-only chat",
+                "§e/mgm <mode> [player] §7- change gamemode (s / c / a / sp)",
+                "§e/regear §7- wipe your inventory and get the Amethyst PvP kit"
         };
         for (String l : lines) ok(src, l);
+        return 1;
+    }
+
+    /** runs a trigger for the player who typed the command (works for everyone) */
+    private static int playerTrigger(CommandContext<CommandSourceStack> c, String trigger) {
+        CommandSourceStack src = c.getSource();
+        ServerPlayer me = src.getPlayer();
+        if (me == null) { src.sendFailure(Component.literal("Players only.")); return 0; }
+        run(src.getServer(), "execute as " + me.getName().getString() + " at @s run trigger " + trigger);
+        return 1;
+    }
+
+    private static int regear(CommandContext<CommandSourceStack> c) {
+        CommandSourceStack src = c.getSource();
+        if (deny(src)) return 0;
+        ServerPlayer me = src.getPlayer();
+        if (me == null) { src.sendFailure(Component.literal("Players only.")); return 0; }
+        run(src.getServer(), "execute as " + me.getName().getString() + " at @s run function astro_magic:amethyst/regear_do");
+        return 1;
+    }
+
+    private static final SuggestionProvider<CommandSourceStack> MODES =
+            (ctx, builder) -> SharedSuggestionProvider.suggest(java.util.List.of("survival", "creative", "spectator", "adventure", "s", "c", "sp", "a"), builder);
+
+    private static int gm(CommandContext<CommandSourceStack> c, boolean other) {
+        CommandSourceStack src = c.getSource();
+        if (deny(src)) return 0;
+        String m = StringArgumentType.getString(c, "mode").toLowerCase(Locale.ROOT);
+        String mode = switch (m) {
+            case "s", "0", "survival" -> "survival";
+            case "c", "1", "creative" -> "creative";
+            case "a", "2", "adventure" -> "adventure";
+            case "sp", "3", "spectator" -> "spectator";
+            default -> null;
+        };
+        if (mode == null) { src.sendFailure(Component.literal("Unknown gamemode. Use survival / creative / adventure / spectator (or s / c / a / sp).")); return 0; }
+        String real;
+        if (other) {
+            String name = StringArgumentType.getString(c, "player");
+            if (!validName(src, name)) return 0;
+            ServerPlayer t = online(src, name);
+            if (t == null) return 0;
+            real = t.getName().getString();
+        } else {
+            ServerPlayer me = src.getPlayer();
+            if (me == null) { src.sendFailure(Component.literal("Players only.")); return 0; }
+            real = me.getName().getString();
+        }
+        run(src.getServer(), "gamemode " + mode + " " + real);
+        ok(src, "\u00a7d\u2726 " + real + " is now in \u00a7e" + mode + "\u00a7d mode.");
         return 1;
     }
 
@@ -229,6 +372,17 @@ public class AstroStaff implements ModInitializer {
         d.register(Commands.literal("mstop").executes(c -> tool(c, "staff/stop", false)));
         d.register(Commands.literal("sc")
                 .then(Commands.argument("message", StringArgumentType.greedyString()).executes(AstroStaff::staffChat)));
+        d.register(Commands.literal("mgm")
+                .then(Commands.argument("mode", StringArgumentType.word()).suggests(MODES)
+                        .executes(c -> gm(c, false))
+                        .then(Commands.argument("player", StringArgumentType.word()).suggests(ONLINE)
+                                .executes(c -> gm(c, true)))));
         d.register(Commands.literal("mhelp").executes(AstroStaff::help));
+        d.register(Commands.literal("regear").executes(AstroStaff::regear));
+        d.register(Commands.literal("setspawn").executes(AstroStaff::setSpawn));
+        d.register(Commands.literal("spawn").executes(AstroStaff::toSpawn));
+        d.register(Commands.literal("shop").executes(c -> playerTrigger(c, "shop set 999")));
+        d.register(Commands.literal("gifs").executes(c -> playerTrigger(c, "gifs set 1")));
+        d.register(Commands.literal("discord").executes(c -> playerTrigger(c, "discord set 1")));
     }
 }
