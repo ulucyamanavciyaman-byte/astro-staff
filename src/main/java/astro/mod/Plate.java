@@ -308,7 +308,7 @@ public final class Plate {
     // ------------------------------------------------------------------ events
     private static boolean ours(Entity e) {
         Component n = e.getCustomName();
-        return n != null && n.getString().startsWith("astro:");
+        return n != null && n.getString().startsWith("astro:") && !n.getString().startsWith("astro:v:");
     }
 
     static void init() {
