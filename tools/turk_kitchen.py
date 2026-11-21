@@ -8,6 +8,7 @@ Outputs:
 import hashlib, io, json, os, re, sys, zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import turk_food as tf
+import kitchen_models as km
 
 ROOT = tf.ROOT
 Img, rgb, shade, mix = tf.Img, tf.rgb, tf.shade, tf.mix
@@ -36,7 +37,7 @@ ING = {
     "sucuk_ham": ("Çiğ Sucuk", "sausage", "9b2a1a", "f2e0c0"), "fistik": ("Antep Fıstığı (iç)", "grain", "8ab04a", "c8a870"),
     "ceviz_ic": ("Ceviz İçi", "grain", "b88a5a", "7a5a3a"), "findik_ic": ("Fındık İçi", "grain", "c8904a", "9a6a3a"),
     "irmik": ("İrmik", "sack", "f0d890", "d8c070"), "nisasta": ("Nişasta", "sack", "fcfcfa", "e0e0e0"),
-    "kahve": ("Kahve Çekirdeği", "grain", "4a2a1a", "6a4a2a"), "hamur": ("Hamur", "dough", "f2e2c0", "e0c898"),
+    "kahve": ("Türk Kahvesi (Öğütülmüş)", "sack", "4a2a1a", "2a1a10"), "hamur": ("Hamur", "dough", "f2e2c0", "e0c898"),
     "yufka": ("Yufka", "round_flat", "f4e8c8", "d8c090"), "karides": ("Karides", "shrimp", "f08060", "f8c0a0"),
     "midye": ("Midye", "mussel_raw", "2a2a3a", "e8902a"), "kalamar": ("Kalamar", "rings_raw", "f2ece0", "d8d0c0"),
     "zeytin": ("Zeytin", "grain", "2a1e2a", "5a4a5a"), "maya": ("Maya", "sack", "e8d8a0", "c8b070"),
@@ -49,6 +50,15 @@ ING = {
     "lahana": ("Lahana", "veg_round", "b8c890", "8aa860"), "asma_yapragi": ("Asma Yaprağı", "leaf", "4a6a2a", "6a8a3a"),
     "kayisi": ("Kayısı", "veg_round", "f09a30", "e8802a"), "incir": ("İncir", "veg_round", "6a3a4a", "c8a070"),
     "uzum": ("Üzüm", "grain", "5a2a5a", "8a4a8a"), "gul": ("Gül Yaprağı", "leaf", "e86a9a", "c84a7a"),
+    "yogurt_mayasi": ("Yoğurt Mayası", "cup", "f4f0e0", "c8b890"), "suzme": ("Süzme Yoğurt", "cup", "fbfaf4", "e0dcc8"),
+    "susam": ("Susam", "grain", "f0e0b0", "d8c088"), "kahve_cig": ("Çiğ Kahve Çekirdeği", "grain", "8a9a5a", "6a7a3a"),
+    "kahve_kavrulmus": ("Kavrulmuş Kahve Çekirdeği", "grain", "3a2414", "5a3a1a"), "sumak": ("Sumak", "jar", "8a1a2a", "f0e0c0"),
+    "isot": ("İsot", "jar", "4a1410", "f0e0c0"), "dereotu": ("Dereotu", "leaf", "5a9a3a", "8ac05a"),
+    "kabartma_tozu": ("Kabartma Tozu", "sack", "fafaf6", "c8d8e8"), "tarcin": ("Tarçın", "jar", "8a4a1a", "f0e0c0"),
+    "kestane": ("Kestane", "veg_round", "6a3a1a", "3a2010"), "sirke": ("Üzüm Sirkesi", "bottle", "c8402a", "8a2a1a"),
+    "salep": ("Salep Tozu", "sack", "f4ece0", "d8c8a8"), "tel_kadayif": ("Tel Kadayıf", "pasta", "f2e0a0", "e0c880"),
+    "taze_fasulye": ("Taze Fasulye", "veg_long", "5a9a3a", "3a7a2a"), "ihlamur": ("Ihlamur", "leaf", "b8b86a", "8a8a4a"),
+    "adacayi": ("Adaçayı", "leaf", "8aa08a", "6a806a"), "kusburnu": ("Kuşburnu", "veg_round", "d8401a", "6a3a1a"),
 }
 VAN = {  # vanilla items players can use as ingredients
     "minecraft:egg": "Yumurta", "minecraft:milk_bucket": "Süt", "minecraft:sugar": "Şeker", "minecraft:honey_bottle": "Bal",
@@ -61,7 +71,9 @@ VAN = {  # vanilla items players can use as ingredients
 VESSELS = {
     "tava": ("Tava", "Kızartma / sote / krep", 6, True), "tencere": ("Tencere", "Çorba / haşlama / güveç", 10, True),
     "tepsi": ("Fırın Tepsisi", "Fırında pişenler", 8, True), "tahta": ("Kesme Tahtası", "Doğrama / karıştırma (ateş gerekmez)", 3, False),
-    "cezve": ("Cezve", "Kahve / sıcak içecekler", 5, True),
+    "cezve": ("Cezve", "Türk kahvesi / sahlep / sıcak çikolata", 6, True),
+    "kase": ("Karıştırma Kabı", "Çırpma / karıştırma / ayran / salata (ateş gerekmez)", 4, False),
+    "caydanlik": ("Çaydanlık", "Çay / bitki çayı demleme", 12, True),
 }
 
 def ing_name(k):
@@ -174,87 +186,181 @@ EXTRA = ["ing:tuz", "ing:karabiber", "ing:pul_biber", "ing:maydanoz", "ing:sogan
          "ing:zeytinyagi", "ing:tereyagi", "ing:limon", "ing:nane_kuru", "ing:salca", "minecraft:sugar", "ing:vanilya"]
 
 def vessel_for(name, cat):
-    if re.search(r"Kahvesi|Sahlep|Sıcak Çikolata|Kakao|Boza", name): return "cezve"
+    if re.search(r"Kahvesi|Sahlep|Sıcak Çikolata|Kakao", name): return "cezve"
     if cat == "icecek":
-        return "tencere" if re.search(r"Çay|Ihlamur|Ada|Elma Çay|Kuşburnu|Nane Limon|Süt", name) else "tahta"
+        if re.search(r"Çay|Ihlamur|Ada|Kuşburnu|Nane Limon", name): return "caydanlik"
+        if re.search(r"Süt$|Boza|Şerbet", name): return "tencere"
+        return "kase"
     if cat in ("corba", "ana", "pilav", "dolma"): return "tencere"
     if cat in ("hamur", "ekmek"): return "tepsi"
     if cat == "tatli":
-        if re.search(r"Dondurma|Lokum|Cezerye|Pişmaniye|Güllaç|Kazan Dibi Dondurmal", name): return "tahta"
+        if re.search(r"Dondurma|Güllaç|Tiramisu", name): return "kase"
+        if re.search(r"Lokum|Cezerye|Pişmaniye", name): return "tencere"
         if re.search(r"Sütlaç|Muhallebi|Keşkül|Supangle|Aşure|Zerde|Helva|Höşmerim|Tavuk Göğsü|Kazandibi", name): return "tencere"
-        if re.search(r"Lokma|Tulumba|Pişi|Kemalpaşa", name): return "tava"
+        if re.search(r"Lokma|Tulumba|Pişi|Kemalpaşa|Halka|Katmer", name): return "tava"
         return "tepsi"
-    if cat == "meze": return "tava" if re.search(r"Közlenmiş|Şakşuka|Mücver|Babagannuş", name) else "tahta"
-    if cat == "kahv": return "tahta" if re.search(r"Peynir|Zeytin|Bal Kaymak|Tahin|Tabağı|Lor|Tulum", name) else "tava"
-    if cat == "kuru": return "tava" if re.search(r"Kavrulmuş|Kestane|Leblebi|Çekirde|Popcorn", name) else "tahta"
+    if cat == "meze":
+        if re.search(r"Közlenmiş|Şakşuka|Mücver|Babagannuş|Patlıcan", name): return "tava"
+        if re.search(r"Pilaki|Fava|Enginar|Börülce", name): return "tencere"
+        return "kase"
+    if cat == "kahv": return "tahta" if re.search(r"Peynir|Zeytin|Tabağı|Lor|Tulum|Pastırma", name) else ("kase" if re.search(r"Kaymak|Pekmez", name) else "tava")
+    if cat == "kuru": return "tava" if re.search(r"Kavrulmuş|Kestane|Leblebi|Çekirde|Popcorn|Badem|Fındık|Fıstığı", name) else ("tencere" if re.search(r"Şekeri|Pestil|Sucuk", name) else "tahta")
     if cat == "dunya":
         if re.search(r"Kek|Brownie|Turta|Lazanya|Pizza|Cheesecake|Fırın|Sufle", name): return "tepsi"
-        if re.search(r"Püre|Haşlanmış|Puding|Çorba", name): return "tencere"
-        if re.search(r"Salata|Meyve", name): return "tahta"
+        if re.search(r"Püre|Haşlanmış|Puding|Çorba|Makarna", name): return "tencere"
+        if re.search(r"Salata|Smoothie|Milkshake|Limonata|Ayran", name): return "kase"
         return "tava"
-    if re.search(r"Fırın|Tandır|Testi|Kiremit|Kuyu|Kağıt|Elbasan|Güveç", name): return "tepsi"
+    if re.search(r"Fırın|Tandır|Testi|Kiremit|Kuyu|Kağıt|Elbasan|Güveç|Pide|Lahmacun", name): return "tepsi"
     return "tava"
 
-HAND = [  # hand-written showcase recipes (vessel, ingredients, result name)
-    ("tava", ["minecraft:honey_bottle", "minecraft:bread"], "Pankek"),
-    ("tava", ["minecraft:egg", "minecraft:milk_bucket", "ing:un"], "Krep"),
-    ("tava", ["minecraft:egg", "minecraft:egg", "ing:tuz"], "Omlet"),
-    ("tava", ["minecraft:egg", "ing:tereyagi"], "Sahanda Yumurta"),
-    ("tava", ["minecraft:egg", "minecraft:egg", "ing:peynir"], "Peynirli Omlet"),
-    ("tava", ["minecraft:egg", "minecraft:egg", "ing:mantar"], "Mantarlı Omlet"),
-    ("tava", ["minecraft:potato", "ing:zeytinyagi", "ing:tuz"], "Patates Kızartması"),
-    ("tava", ["minecraft:egg", "ing:domates", "ing:biber"], "Menemen"),
-    ("tava", ["minecraft:egg", "ing:sucuk_ham"], "Sucuklu Yumurta"),
-    ("tava", ["minecraft:bread"], "Kızarmış Ekmek"),
-    ("tahta", ["minecraft:bread", "minecraft:honey_bottle"], "Ballı Ekmek"),
-    ("tava", ["minecraft:bread", "minecraft:egg"], "Yumurtalı Ekmek"),
-    ("tava", ["minecraft:bread", "ing:kasar"], "Kaşarlı Tost"),
-    ("tava", ["minecraft:bread", "ing:kasar", "ing:sucuk_ham"], "Sucuklu Tost"),
-    ("tahta", ["ing:yogurt", "su", "ing:tuz"], "Ayran"),
-    ("tahta", ["ing:yogurt", "su"], "Ev Yapımı Ayran"),
-    ("tahta", ["ing:limon", "minecraft:sugar", "su"], "Limonata"),
-    ("tahta", ["ing:limon", "minecraft:sugar", "su", "ing:nane"], "Ev Yapımı Limonata"),
-    ("tencere", ["ing:cay", "su"], "Türk Çayı"),
-    ("cezve", ["ing:kahve", "su"], "Türk Kahvesi Fincanı"),
-    ("cezve", ["ing:kahve", "su", "minecraft:sugar"], "Dibek Kahvesi"),
-    ("cezve", ["ing:cikolata", "minecraft:milk_bucket"], "Sıcak Çikolata"),
-    ("cezve", ["minecraft:cocoa_beans", "minecraft:milk_bucket", "minecraft:sugar"], "Sütlü Kakao"),
-    ("tencere", ["ing:mercimek", "ing:sogan", "su"], "Mercimek Çorbası"),
-    ("tencere", ["ing:pirinc", "su", "ing:tereyagi"], "Pirinç Pilavı"),
-    ("tencere", ["ing:bulgur", "su", "ing:salca"], "Bulgur Pilavı"),
-    ("tencere", ["ing:makarna", "su", "ing:salca"], "Spagetti"),
-    ("tencere", ["minecraft:milk_bucket", "ing:pirinc", "minecraft:sugar"], "Sütlaç"),
-    ("tencere", ["minecraft:potato", "minecraft:milk_bucket", "ing:tereyagi"], "Patates Püresi"),
-    ("tepsi", ["ing:un", "minecraft:egg", "minecraft:sugar", "minecraft:milk_bucket"], "Kek"),
-    ("tepsi", ["ing:un", "minecraft:egg", "minecraft:sugar", "ing:cikolata"], "Çikolatalı Kek"),
-    ("tepsi", ["ing:hamur", "ing:domates", "ing:kasar"], "Pizza"),
-    ("tepsi", ["ing:yufka", "ing:fistik", "minecraft:sugar", "ing:tereyagi"], "Baklava"),
-    ("tepsi", ["ing:hamur", "ing:kiyma", "ing:domates"], "Lahmacun"),
-    ("tava", ["ing:kiyma", "ing:sogan", "ing:tuz"], "Izgara Köfte"),
-    ("tava", ["ing:kiyma", "ing:pul_biber", "ing:tuz"], "Adana Kebap"),
-    ("tava", ["minecraft:bread", "ing:kiyma", "ing:domates"], "Hamburger"),
-    ("tahta", ["minecraft:sweet_berries", "minecraft:milk_bucket", "minecraft:sugar"], "Milkshake"),
-    ("tahta", ["minecraft:sweet_berries", "minecraft:apple", "ing:yogurt"], "Smoothie"),
-    ("tahta", ["ing:domates", "ing:salatalik", "ing:sogan", "ing:limon"], "Çoban Salatası"),
-    ("tahta", ["ing:yogurt", "ing:salatalik", "ing:sarimsak", "su"], "Cacık"),
+T, K, TP, TH, CZ, KS, CD = "tava", "tencere", "tepsi", "tahta", "cezve", "kase", "caydanlik"
+def I(*k): return ["ing:" + x if x and not x.startswith("minecraft:") and x != "su" else x for x in k]
+EGG, MILK, SUGAR, HONEY, BREAD = "minecraft:egg", "minecraft:milk_bucket", "minecraft:sugar", "minecraft:honey_bottle", "minecraft:bread"
+BEEF, CHICKEN, MUTTON, COD, SALMON = "minecraft:beef", "minecraft:chicken", "minecraft:mutton", "minecraft:cod", "minecraft:salmon"
+POTATO, CARROT, APPLE, WHEAT, PUMPKIN = "minecraft:potato", "minecraft:carrot", "minecraft:apple", "minecraft:wheat", "minecraft:pumpkin"
+HAND = [  # realistic hand-written recipes (vessel, ingredients, result name)
+    # --- breakfast
+    (T, [HONEY, BREAD], "Pankek"), (T, I(EGG, MILK, "un", "tereyagi"), "Krep"), (T, I(EGG, EGG, "tuz", "tereyagi"), "Omlet"),
+    (T, I(EGG, "tereyagi"), "Sahanda Yumurta"), (T, I(EGG, EGG, "peynir", "tereyagi"), "Peynirli Omlet"),
+    (T, I(EGG, EGG, "mantar", "tereyagi"), "Mantarlı Omlet"), (T, I(EGG, EGG, "domates", "biber", "zeytinyagi"), "Menemen"),
+    (T, I(EGG, EGG, "sucuk_ham"), "Sucuklu Yumurta"), (K, I(EGG, "su"), "Haşlanmış Yumurta"),
+    (K, I(EGG, EGG, "yogurt", "sarimsak", "tereyagi", "pul_biber"), "Çılbır"), (T, I("tereyagi", "un", "kasar", "su"), "Mıhlama"),
+    (TH, I("peynir", "zeytin", "domates", "salatalik", HONEY, BREAD), "Kahvaltı Tabağı"), (KS, I("kaymak", HONEY), "Bal Kaymak"),
+    (KS, I("tahin", "pekmez"), "Tahin Pekmez"), (T, I(BEEF, "tereyagi", "tuz"), "Kavurma"), (TH, I("peynir"), "Beyaz Peynir"),
+    (TH, I("kasar"), "Kaşar Peyniri"), (TH, I(BEEF, "kimyon", "sarimsak", "pul_biber"), "Pastırma"), (T, I("sucuk_ham"), "Sucuk"),
+    (T, [BREAD], "Kızarmış Ekmek"), (TH, [BREAD, HONEY], "Ballı Ekmek"), (T, [BREAD, EGG, MILK], "Yumurtalı Ekmek"),
+    (T, I(BREAD, "kasar", "tereyagi"), "Kaşarlı Tost"), (T, I(BREAD, "kasar", "sucuk_ham", "tereyagi"), "Sucuklu Tost"),
+    (T, I("hamur", "zeytinyagi"), "Pişi"), (T, I("yufka", "peynir", "maydanoz", "tereyagi"), "Gözleme"),
+    # --- soups
+    (K, I("mercimek", "sogan", CARROT, "tereyagi", "su"), "Mercimek Çorbası"),
+    (K, I("mercimek", "bulgur", "pirinc", "salca", "nane_kuru", "su"), "Ezogelin Çorbası"),
+    (K, I("yogurt", "pirinc", EGG, "un", "nane_kuru", "su"), "Yayla Çorbası"),
+    (K, I("yogurt", "un", "domates", "biber", "salca", "su"), "Tarhana Çorbası"),
+    (K, I("domates", "un", "tereyagi", MILK, "su"), "Domates Çorbası"),
+    (K, I(CHICKEN, "sehriye", CARROT, "limon", "su"), "Tavuk Suyu Çorbası"), (K, I("sehriye", "salca", "tereyagi", "su"), "Şehriye Çorbası"),
+    (K, I("mantar", "un", "tereyagi", MILK, "su"), "Mantar Çorbası"), (K, I(MUTTON, "yogurt", EGG, "limon", "un", "su"), "Düğün Çorbası"),
+    (K, I(POTATO, CARROT, "kabak", "domates", "sogan", "su"), "Sebze Çorbası"), (K, I(COD, POTATO, CARROT, "limon", "su"), "Balık Çorbası"),
+    (K, I(MUTTON, "sarimsak", "sirke", "un", "tereyagi", "su"), "İşkembe Çorbası"),
+    # --- kebab / köfte
+    (T, I("kiyma", "pul_biber", "isot", "sogan", "tuz"), "Adana Kebap"), (T, I("kiyma", "isot", "sogan", "tuz"), "Urfa Kebap"),
+    (T, I(BEEF, BREAD, "salca", "tereyagi", "yogurt"), "İskender Kebap"), (T, I(BEEF, "sogan", "sumak", "yufka"), "Et Döner"),
+    (T, I(CHICKEN, "yogurt", "salca", "yufka"), "Tavuk Döner"), (T, I(BEEF, "sogan", "biber", "domates", "zeytinyagi"), "Şiş Kebap"),
+    (T, I(CHICKEN, "yogurt", "salca", "sarimsak"), "Tavuk Şiş"), (TP, I("kiyma", "yufka", "sarimsak", "yogurt", "salca"), "Beyti Kebap"),
+    (T, I("patlican", "yogurt", "sarimsak", "kiyma", "tereyagi"), "Alinazik Kebabı"),
+    (K, I(BEEF, "patlican", MILK, "un", "tereyagi", "kasar"), "Hünkar Beğendi"),
+    (K, I(BEEF, "sogan", "salca", CARROT, POTATO, "su"), "Tas Kebabı"), (K, I(MUTTON, "bezelye", CARROT, POTATO, "sogan", "su"), "Orman Kebabı"),
+    (TP, I(MUTTON, "tuz", "karabiber", "su"), "Kuzu Tandır"), (TP, I(BEEF, "domates", "biber", "sogan", "sarimsak", "tereyagi"), "Testi Kebabı"),
+    (T, I(MUTTON, "nane_kuru", "tuz", "karabiber"), "Pirzola"), (T, I("kiyma", "sogan", BREAD, "tuz"), "İnegöl Köfte"),
+    (T, I("kiyma", "sogan", "tuz"), "Izgara Köfte"), (TP, I("kiyma", POTATO, "domates", "biber", "salca"), "İzmir Köfte"),
+    (T, I("kiyma", "pirinc", EGG, "un", "sogan"), "Kadınbudu Köfte"), (KS, I("bulgur", "isot", "salca", "sogan", "sarimsak", "maydanoz"), "Çiğ Köfte"),
+    (T, I("bulgur", "kiyma", "ceviz_ic", "sogan", "un", "zeytinyagi"), "İçli Köfte"),
+    (KS, I("mercimek", "bulgur", "sogan", "salca", "maydanoz", "su"), "Mercimek Köftesi"),
+    (K, I("kiyma", "pirinc", POTATO, "salca", "su"), "Sulu Köfte"), (T, I("kiyma", "sarimsak", BREAD, "tuz"), "Akçaabat Köfte"),
+    # --- dough / bakery
+    (TP, I("hamur", "kiyma", "domates", "biber", "sogan", "maydanoz"), "Lahmacun"),
+    (TP, I("hamur", "kiyma", "sogan", "domates", EGG), "Kıymalı Pide"), (TP, I("hamur", "kasar", "tereyagi", EGG), "Kaşarlı Pide"),
+    (TP, I("hamur", BEEF, "kasar", EGG, "tereyagi"), "Karadeniz Pidesi"),
+    (TP, I("yufka", "peynir", "maydanoz", EGG, "tereyagi", "su"), "Su Böreği"),
+    (T, I("yufka", "peynir", "maydanoz", "zeytinyagi"), "Sigara Böreği"), (TP, I("yufka", "ispanak", "peynir", EGG, MILK), "Kol Böreği"),
+    (TP, I("un", "yogurt", EGG, "peynir", "maya", "zeytinyagi"), "Poğaça"), (TP, I("un", MILK, "maya", "tereyagi", SUGAR, EGG), "Açma"),
+    (K, I("hamur", "kiyma", "sogan", "yogurt", "sarimsak", "su"), "Mantı"), (TP, I("hamur", "pekmez", "susam"), "Simit"),
+    (T, I("un", "yogurt", "maya", "tuz", "su"), "Bazlama"), (T, I("un", "su", "tuz"), "Lavaş"), (TP, I("un", "maya", "su", "tuz"), "Köy Ekmeği"),
+    (TP, I("hamur", EGG, "susam"), "Ramazan Pidesi"), (TP, I("hamur", "ceviz_ic", "tarcin", SUGAR), "Ay Çöreği"),
+    (TP, I("hamur", "tahin", SUGAR), "Tahinli Çörek"), (TP, I("misir", "un", "yogurt", EGG), "Mısır Ekmeği"),
+    # --- meze / salads (cold = mixing bowl)
+    (KS, I("domates", "salatalik", "biber", "sogan", "maydanoz", "zeytinyagi"), "Çoban Salatası"),
+    (KS, I("domates", "ceviz_ic", "sogan", "pekmez", "maydanoz", "zeytinyagi"), "Gavurdağı Salatası"),
+    (KS, I("bulgur", "salca", "maydanoz", "nane", "limon", "zeytinyagi"), "Kısır"), (KS, I("suzme", "sarimsak", "nane_kuru", "dereotu"), "Haydari"),
+    (KS, I("yogurt", "salatalik", "sarimsak", "dereotu", "su", "zeytinyagi"), "Cacık"),
+    (TH, I("domates", "biber", "sogan", "maydanoz", "pul_biber", "nar"), "Acılı Ezme"),
+    (KS, I("nohut", "tahin", "limon", "sarimsak", "zeytinyagi"), "Humus"), (T, I("patlican", "tahin", "sarimsak", "limon", "zeytinyagi"), "Babagannuş"),
+    (T, I("patlican", "kabak", "domates", "biber", "sarimsak", "zeytinyagi"), "Şakşuka"),
+    (KS, I("fasulye", "sogan", "maydanoz", EGG, "sumak", "zeytinyagi"), "Piyaz"), (T, I("patlican", "sarimsak", "limon", "zeytinyagi"), "Patlıcan Salatası"),
+    (KS, I("kirmizi_biber", "ceviz_ic", BREAD, "pekmez", "zeytinyagi"), "Muhammara"),
+    (KS, I(POTATO, CARROT, "bezelye", EGG, "yogurt"), "Rus Salatası"), (KS, I("salatalik", "biber", "sirke", "tuz", "sarimsak", "su"), "Turşu"),
+    (T, I("kabak", EGG, "un", "dereotu", "peynir", "zeytinyagi"), "Mücver"), (KS, I("minecraft:beetroot", "sarimsak", "yogurt", "zeytinyagi"), "Pancar Salatası"),
+    (T, I("kirmizi_biber", "sarimsak", "zeytinyagi", "sirke"), "Közlenmiş Biber"),
+    # --- dolma
+    (K, I("asma_yapragi", "pirinc", "sogan", "nane_kuru", "zeytinyagi", "limon"), "Yaprak Sarma"),
+    (K, I("biber", "pirinc", "kiyma", "domates", "salca", "su"), "Biber Dolması"), (K, I("lahana", "pirinc", "kiyma", "salca", "su"), "Lahana Sarması"),
+    (K, I("midye", "pirinc", "sogan", "karabiber", "limon"), "Midye Dolma"), (K, I("kabak", "kiyma", "pirinc", "domates", "su"), "Kabak Dolması"),
+    # --- mains
+    (TP, I("patlican", "kiyma", "sogan", "domates", "biber", "zeytinyagi"), "Karnıyarık"),
+    (TP, I("patlican", "sogan", "domates", "sarimsak", "zeytinyagi"), "İmam Bayıldı"),
+    (K, I("fasulye", "salca", "sogan", "tereyagi", "su"), "Kuru Fasulye"), (K, I("nohut", BEEF, "salca", "sogan", "su"), "Etli Nohut"),
+    (K, I("taze_fasulye", "domates", "sogan", "zeytinyagi", "su"), "Taze Fasulye"), (TP, I("patlican", "kiyma", "domates", "sogan", "biber"), "Musakka"),
+    (K, I("patlican", "kabak", POTATO, "biber", "domates", "su"), "Türlü"), (T, I(CHICKEN, "biber", "domates", "sogan", "mantar"), "Tavuk Sote"),
+    (T, I(BEEF, "biber", "sogan", "domates"), "Et Sote"), (K, I("bamya", BEEF, "domates", "limon", "su"), "Bamya"),
+    (K, I("ispanak", "pirinc", "sogan", "yogurt"), "Ispanak Yemeği"), (K, I("pirasa", CARROT, "pirinc", "limon", "zeytinyagi", "su"), "Zeytinyağlı Pırasa"),
+    (K, I("bezelye", CARROT, POTATO, "salca", "su"), "Bezelye Yemeği"), (K, I(CHICKEN, "ceviz_ic", BREAD, "sarimsak", "pul_biber", "su"), "Çerkez Tavuğu"),
+    (K, I(WHEAT, MUTTON, "tereyagi", "su", "tuz"), "Keşkek"), (TP, I(CHICKEN, POTATO, "salca", "zeytinyagi"), "Fırın Tavuk"),
+    (T, I(CHICKEN, "salca", "pul_biber"), "Tavuk Kanat"), (K, I("lahana", "kiyma", "salca", "pirinc", "su"), "Kapuska"),
+    (TP, I(BEEF, "patlican", "domates", "biber", "sogan"), "Güveç"), (K, I(MUTTON, POTATO, CARROT, "sogan", "su"), "Kuzu Haşlama"),
+    # --- rice / pasta
+    (K, I("pirinc", "tereyagi", "su", "tuz"), "Pirinç Pilavı"), (K, I("bulgur", "salca", "sogan", "tereyagi", "su"), "Bulgur Pilavı"),
+    (K, I("pirinc", "sehriye", "tereyagi", "su"), "Şehriyeli Pilav"), (K, I("pirinc", "uzum", "findik_ic", "tarcin", "tereyagi", "su"), "İç Pilav"),
+    (K, I("pirinc", "nohut", "tereyagi", "su"), "Nohutlu Pilav"), (K, I("makarna", "su", "tuz", "salca"), "Spagetti"),
+    (TP, I("makarna", MILK, EGG, "kasar", "tereyagi"), "Fırın Makarna"), (K, I("makarna", "kiyma", "salca", "su"), "Kıymalı Makarna"),
+    (K, I("makarna", "yogurt", "sarimsak", "tereyagi", "pul_biber", "su"), "Yoğurtlu Makarna"), (K, I("hamur", "tereyagi", "su", "tuz"), "Erişte"),
+    # --- seafood
+    (T, I(COD, "un", "zeytinyagi", "tuz"), "Hamsi Tava"), (T, I(COD, "limon", "zeytinyagi", "tuz"), "Levrek Izgara"),
+    (T, I(SALMON, "limon", "tereyagi"), "Somon Izgara"), (T, I("kalamar", "un", "zeytinyagi", "tuz"), "Kalamar Tava"),
+    (T, I("midye", "un", "zeytinyagi", "tuz"), "Midye Tava"), (TP, I("karides", "domates", "biber", "kasar", "tereyagi"), "Karides Güveç"),
+    (K, I(COD, "domates", "sogan", "limon", "su"), "Hamsi Buğulama"),
+    # --- street food
+    (T, I(COD, BREAD, "sogan", "marul"), "Balık Ekmek"), (TP, I(POTATO, "tereyagi", "kasar", "misir", "zeytin"), "Kumpir"),
+    (T, I(BEEF, "yufka", "domates", "sogan", "maydanoz"), "Tantuni"), (T, I(BREAD, "kiyma", "salca", "sarimsak"), "Islak Hamburger"),
+    (T, I(MUTTON, BREAD, "kimyon", "pul_biber"), "Kokoreç"), (K, I("misir", "su", "tuz"), "Haşlanmış Mısır"), (T, I("misir", "tuz"), "Közlenmiş Mısır"),
+    (T, I("kestane"), "Kestane Kebap"),
+    # --- desserts
+    (TP, I("yufka", "fistik", "tereyagi", SUGAR, "su", "limon"), "Baklava"), (TP, I("yufka", "ceviz_ic", "tereyagi", SUGAR, "su"), "Cevizli Baklava"),
+    (TP, I("tel_kadayif", "peynir", "tereyagi", SUGAR, "su", "fistik"), "Künefe"), (TP, I("tel_kadayif", "ceviz_ic", "tereyagi", SUGAR, "su"), "Kadayıf"),
+    (K, I(MILK, "pirinc", SUGAR, "nisasta"), "Sütlaç"), (TP, I(MILK, "pirinc", SUGAR, "nisasta", "vanilya"), "Fırın Sütlaç"),
+    (K, I(MILK, SUGAR, "nisasta", "un", "tereyagi"), "Kazandibi"), (K, I(MILK, SUGAR, "nisasta", "vanilya"), "Muhallebi"),
+    (K, I(MILK, SUGAR, "nisasta", "findik_ic"), "Keşkül"), (TP, I("irmik", EGG, "yogurt", SUGAR, "un", "su"), "Revani"),
+    (TP, I("irmik", "un", "tereyagi", EGG, SUGAR, "su"), "Şekerpare"), (T, I("un", EGG, "tereyagi", SUGAR, "su", "zeytinyagi"), "Tulumba"),
+    (T, I("un", "maya", "su", SUGAR, "zeytinyagi"), "Lokma"), (K, I(WHEAT, "nohut", "fasulye", "kayisi", "incir", SUGAR), "Aşure"),
+    (KS, I("yufka", MILK, SUGAR, "gul", "nar", "ceviz_ic"), "Güllaç"), (T, I("irmik", "tereyagi", MILK, SUGAR), "İrmik Helvası"),
+    (T, I("un", "tereyagi", SUGAR, MILK), "Un Helvası"), (K, I("tahin", SUGAR, "ceviz_ic"), "Tahin Helvası"),
+    (K, I(PUMPKIN, SUGAR, "ceviz_ic", "tahin"), "Kabak Tatlısı"), (TP, I(APPLE, SUGAR, "kaymak", "su"), "Ayva Tatlısı"),
+    (K, I(CHICKEN, MILK, SUGAR, "pirinc", "tarcin"), "Tavuk Göğsü"), (TP, I("un", EGG, "tereyagi", "cikolata", MILK), "Profiterol"),
+    (K, I(MILK, "kakao_tozu", SUGAR, "nisasta"), "Supangle"), (TP, I("un", EGG, SUGAR, MILK, "krema"), "Trileçe"),
+    (TP, I("un", "tereyagi", SUGAR, EGG, "vanilya", "kabartma_tozu"), "Kurabiye"), (TP, I("peynir", "krema", EGG, SUGAR, "un"), "San Sebastian"),
+    (KS, I("kahve", "krema", "kakao_tozu", SUGAR, EGG), "Tiramisu"), (KS, I(MILK, SUGAR, "salep", "krema"), "Maraş Dondurması"),
+    (KS, I(MILK, SUGAR, "salep", "fistik"), "Fıstıklı Dondurma"), (KS, I(MILK, SUGAR, "salep", "cikolata"), "Çikolatalı Dondurma"),
+    (KS, I(MILK, SUGAR, "salep", "kaymak"), "Kaymaklı Dondurma"), (K, I(SUGAR, "nisasta", "su", "gul", "limon"), "Lokum"),
+    (K, I("peynir", "irmik", EGG, SUGAR, "su"), "Kemalpaşa Tatlısı"), (T, I("yufka", "fistik", "kaymak", SUGAR, "tereyagi"), "Katmer"),
+    # --- drinks
+    (KS, I("yogurt", "su", "tuz"), "Ayran"), (KS, I("suzme", "su", "tuz"), "Ev Yapımı Ayran"),
+    (CD, I("cay", "su"), "Türk Çayı"), (CD, I("ihlamur", "su"), "Ihlamur"), (CD, I("adacayi", "su"), "Ada Çayı"),
+    (CD, I("kusburnu", "su"), "Kuşburnu Çayı"), (CD, I(APPLE, "tarcin", "su"), "Elma Çayı"), (CD, I("nane", "limon", "su"), "Nane Limon"),
+    (CZ, I("kahve", "su"), "Türk Kahvesi Fincanı"), (CZ, I("kahve", MILK, "su"), "Dibek Kahvesi"), (CZ, I("fistik", MILK), "Menengiç Kahvesi"),
+    (CZ, I(MILK, "salep", SUGAR, "tarcin"), "Sahlep"), (CZ, I("cikolata", MILK), "Sıcak Çikolata"),
+    (CZ, I("minecraft:cocoa_beans", MILK, SUGAR), "Sütlü Kakao"), (K, I(WHEAT, SUGAR, "su", "maya"), "Boza"),
+    (KS, I("limon", SUGAR, "su"), "Limonata"), (KS, I("limon", SUGAR, "su", "nane"), "Ev Yapımı Limonata"),
+    (K, I("minecraft:sweet_berries", SUGAR, "su"), "Vişne Şerbeti"), (K, I("gul", SUGAR, "limon", "su"), "Gül Şerbeti"),
+    (KS, I(MILK, "yogurt_mayasi"), "Kefir"), (KS, I(CARROT, "minecraft:beetroot", "bulgur", "tuz", "su"), "Şalgam"),
+    (TH, I("portakal", "portakal"), "Portakal Suyu"), (TH, I("nar", "nar"), "Nar Suyu"), (KS, I("kayisi", SUGAR, "su"), "Kayısı Suyu"),
+    (K, I(MILK), "Süt"), (KS, I("minecraft:sweet_berries", MILK, SUGAR), "Milkshake"),
+    (KS, I("minecraft:sweet_berries", APPLE, "yogurt"), "Smoothie"),
+    # --- world
+    (T, I(POTATO, "zeytinyagi", "tuz"), "Patates Kızartması"), (K, I(POTATO, MILK, "tereyagi"), "Patates Püresi"),
+    (TP, I("un", EGG, SUGAR, MILK, "kabartma_tozu"), "Kek"), (TP, I("un", EGG, SUGAR, "cikolata", "kabartma_tozu"), "Çikolatalı Kek"),
+    (TP, I("hamur", "domates", "kasar"), "Pizza"), (T, I(BREAD, "kiyma", "domates", "marul"), "Hamburger"),
+    (KS, I(APPLE, "minecraft:sweet_berries", "portakal", HONEY), "Meyve Salatası"),
 ]
-PROCESS = [  # basic prep recipes that produce ingredients (vessel, ingredients, result ing, count)
-    ("tahta", ["minecraft:wheat", "minecraft:wheat", "minecraft:wheat"], "un", 3),
-    ("tahta", ["ing:un", "su"], "hamur", 2), ("tahta", ["ing:un", "su", "ing:maya"], "hamur", 4),
-    ("tahta", ["ing:hamur"], "yufka", 2), ("tahta", ["minecraft:beef"], "kiyma", 2), ("tahta", ["minecraft:mutton"], "kiyma", 2),
-    ("tahta", ["minecraft:milk_bucket"], "tereyagi", 2), ("tencere", ["minecraft:milk_bucket", "ing:limon"], "peynir", 2),
-    ("tencere", ["minecraft:milk_bucket", "ing:yogurt"], "yogurt", 4), ("tencere", ["minecraft:milk_bucket"], "kaymak", 2),
-    ("tepsi", ["ing:peynir"], "kasar", 1), ("tencere", ["minecraft:wheat", "su"], "bulgur", 3),
-    ("tava", ["minecraft:wheat"], "irmik", 2), ("tahta", ["minecraft:cocoa_beans", "minecraft:cocoa_beans"], "kakao_tozu", 2),
-    ("tahta", ["ing:kakao_tozu", "minecraft:sugar", "minecraft:milk_bucket"], "cikolata", 3),
-    ("tahta", ["minecraft:beef", "ing:kimyon", "ing:pul_biber"], "sucuk_ham", 3),
-    ("tencere", ["ing:uzum", "ing:uzum"], "pekmez", 2), ("tava", ["ing:kahve"], "kahve", 2),
-    ("tahta", ["minecraft:brown_mushroom"], "mantar", 2), ("tahta", ["minecraft:sweet_berries", "minecraft:sweet_berries"], "nar", 1),
-    ("tahta", ["minecraft:apple", "minecraft:sugar"], "kayisi", 1), ("tahta", ["ing:findik_ic", "minecraft:sugar"], "tahin", 1),
-    ("tencere", ["ing:nohut", "su"], "nohut", 3), ("tencere", ["ing:fasulye", "su"], "fasulye", 3),
-    ("tahta", ["minecraft:kelp"], "asma_yapragi", 2), ("tencere", ["ing:domates", "ing:domates", "ing:tuz"], "salca", 2),
-    ("tahta", ["minecraft:carrot", "minecraft:carrot"], "biber", 1), ("tahta", ["minecraft:beetroot", "minecraft:beetroot"], "domates", 2),
-    ("tahta", ["minecraft:potato", "minecraft:potato"], "sogan", 2), ("tahta", ["minecraft:wheat", "minecraft:wheat"], "pirinc", 2),
+PROCESS = [  # realistic prep: (vessel, ingredients, result ing, count[, seconds])
+    (TH, [WHEAT, WHEAT, WHEAT], "un", 3), (TH, [WHEAT, WHEAT], "irmik", 2),
+    (KS, I("un", "su", "tuz", "maya"), "hamur", 4), (KS, I("un", "su", "tuz"), "hamur", 2), (KS, I("un", EGG, "su"), "hamur", 3),
+    (TH, I("hamur"), "yufka", 2), (TH, [BEEF], "kiyma", 2), (TH, [MUTTON], "kiyma", 2),
+    (KS, [MILK], "krema", 2), (KS, I("krema"), "tereyagi", 2), (K, I(MILK, "limon"), "peynir", 2), (K, I("peynir", "su", "tuz"), "kasar", 1),
+    (K, I(MILK, "yogurt_mayasi"), "yogurt", 4, 20), (K, I(MILK, "yogurt"), "yogurt", 4, 20), (K, [MILK, MILK], "kaymak", 2, 16),
+    (KS, I("yogurt", "yogurt"), "suzme", 1), (K, I(WHEAT, "su"), "bulgur", 3, 14),
+    (T, I("kahve_cig"), "kahve_kavrulmus", 1, 8), (TH, I("kahve_kavrulmus"), "kahve", 2),
+    (TH, ["minecraft:cocoa_beans", "minecraft:cocoa_beans"], "kakao_tozu", 2), (K, I("kakao_tozu", SUGAR, "tereyagi"), "cikolata", 3),
+    (TH, I(BEEF, "kimyon", "pul_biber", "sarimsak"), "sucuk_ham", 3), (K, I("uzum", "uzum", "su"), "pekmez", 2, 16),
+    (TH, I("susam", "susam"), "tahin", 1), (K, I("domates", "domates", "domates", "tuz"), "salca", 2, 16),
+    (TH, ["minecraft:brown_mushroom"], "mantar", 2), (TH, I("uzum", "su"), "sirke", 1),
 ]
 
 FOODNAME = {}
@@ -274,7 +380,7 @@ def build_recipes():
     by_name = {n: (n, c, s) for n, c, s in foods}
     out, used = [], set()
 
-    def add(vessel, keys, result_name, give, human=None, alt=False):
+    def add(vessel, keys, result_name, give, human=None, alt=False, sec=None):
         keys = sorted(keys)
         k = vessel + "|" + ",".join(keys)
         tries = 0
@@ -284,16 +390,19 @@ def build_recipes():
             keys = sorted(keys + [extra]); k = vessel + "|" + ",".join(keys)
         if k in used: return False
         used.add(k)
-        sec = VESSELS[vessel][2] + (2 if len(keys) > 3 else 0)
+        sec = sec or (VESSELS[vessel][2] + (2 if len(keys) > 3 else 0))
         h = human or " + ".join(ing_name(x) for x in keys)
         out.append((vessel, ",".join(keys), sec, result_name + (" (alternatif)" if alt else ""), h, give))
         return True
 
     for v, keys, rn in HAND:
+        if rn not in by_name: print("!! unknown food in HAND:", rn); continue
         n, c, s = by_name[rn]
         add(v, keys, n, food_give(n, c, s, CATS))
-    for v, keys, ik, cnt in PROCESS:
-        add(v, keys, ING[ik][0] + (f" x{cnt}" if cnt > 1 else ""), ing_give(ik) + (f" {cnt}" if cnt > 1 else ""))
+    for pr in PROCESS:
+        v, keys, ik, cnt = pr[:4]
+        add(v, keys, ING[ik][0] + (f" x{cnt}" if cnt > 1 else ""), ing_give(ik) + (f" {cnt}" if cnt > 1 else ""),
+            sec=pr[4] if len(pr) > 4 else None)
     hand_names = {h[2] for h in HAND}
     for n, c, s in foods:
         if n in hand_names: continue
@@ -410,8 +519,7 @@ def rebuild_pack():
             {"parent": "minecraft:item/generated", "textures": {"layer0": f"astro:item/food/{key}"}}).encode()
     for i, (k, (n, shape, a, b)) in enumerate(ING.items()):
         tex(f"ing_{k}", draw_extra(shape, rgb(a), rgb(b), 2000 + i)); add_cases.setdefault("paper", []).append(f"ing_{k}")
-    for i, v in enumerate(VESSELS):
-        tex(f"v_{v}", draw_extra(f"v_{v}", (0, 0, 0), (0, 0, 0), 3000 + i)); add_cases.setdefault("bowl", []).append(f"v_{v}")
+    km.install(old, add_cases)   # 3D vessels, appliances and the Ocak (smoker) block model
     for i, (n, c, a, b, shape) in enumerate(WORLD):
         sid = tf.slug(n)
         if f"assets/astro/textures/item/food/{sid}.png" in old: continue
@@ -423,7 +531,10 @@ def rebuild_pack():
         else:
             j = {"model": {"type": "minecraft:select", "property": "minecraft:custom_model_data", "index": 0, "cases": [],
                            "fallback": {"type": "minecraft:model", "model": f"minecraft:item/{base}"}}}
-        j["model"]["cases"] += [{"when": k, "model": {"type": "minecraft:model", "model": f"astro:item/food/{k}"}} for k in keys]
+        for k in keys:
+            when, mdl = (k if isinstance(k, tuple) else (k, f"astro:item/food/{k}"))
+            j["model"]["cases"] = [c for c in j["model"]["cases"] if c.get("when") != when]
+            j["model"]["cases"].append({"when": when, "model": {"type": "minecraft:model", "model": mdl}})
         old[path] = json.dumps(j).encode()
     with zipfile.ZipFile(pack, "w", zipfile.ZIP_DEFLATED) as z:
         for n, d in old.items(): z.writestr(n, d)
@@ -434,179 +545,157 @@ def rebuild_pack():
         f"https://github.com/{repo}/releases/download/build-{run}/astro_food_pack.zip {sha1}\n")
 
 # ============================================================================ the kitchen build
-B, ENT = {}, []
+# local coords: x = right, z = forward (away from the player), y = up. Door at z = 0, back wall at z = 14.
+B, ENT, STORE = {}, [], {}
 def put(x, y, z, s): B[(x, y, z)] = s
 def fill(x0, y0, z0, x1, y1, z1, s):
     for x in range(min(x0, x1), max(x0, x1) + 1):
         for y in range(min(y0, y1), max(y0, y1) + 1):
             for z in range(min(z0, z1), max(z0, z1) + 1): B[(x, y, z)] = s
 
+def barrel(x, y, z, title, model=None, face="front", my=None):
+    """a storage barrel (opens like a cupboard) dressed with a 3D model"""
+    put(x, y, z, "BARREL:" + title); STORE.setdefault(title, [])
+    if model: ENT.append(("model", x, y if my is None else my, z, model, face))
+
 def kitchen():
     W0, W1, D0, D1, H = -9, 9, 0, 14, 6
-    # floor (checker tiles) + front porch
     for x in range(W0 - 1, W1 + 2):
         for z in range(D0 - 3, D1 + 2): put(x, 0, z, "minecraft:polished_andesite")
     for x in range(W0 + 1, W1):
-        for z in range(D0 + 1, D1): put(x, 0, z, "minecraft:white_concrete" if (x + z) % 2 else "minecraft:black_concrete")
-    # walls
+        for z in range(D0 + 1, D1): put(x, 0, z, "minecraft:white_concrete" if (x + z) % 2 else "minecraft:light_gray_concrete")
     for y in range(1, H + 1):
         s = "minecraft:white_terracotta" if y < H else "minecraft:smooth_quartz"
         for x in range(W0, W1 + 1): put(x, y, D0, s); put(x, y, D1, s)
         for z in range(D0, D1 + 1): put(W0, y, z, s); put(W1, y, z, s)
-    for x in range(W0, W1 + 1): put(x, 1, D0, "minecraft:light_gray_terracotta"); put(x, 1, D1, "minecraft:light_gray_terracotta")
-    for z in range(D0, D1 + 1): put(W0, 1, z, "minecraft:light_gray_terracotta"); put(W1, 1, z, "minecraft:light_gray_terracotta")
     fill(-1, 1, D0, 1, 3, D0, "minecraft:air")
-    put(-1, 4, D0, "minecraft:spruce_planks"); put(0, 4, D0, "minecraft:spruce_planks"); put(1, 4, D0, "minecraft:spruce_planks")
-    for cx in (-6, 5):
-        fill(cx, 2, D0, cx + 1, 4, D0, "minecraft:glass_pane")
-    for cz in (4, 10):
-        fill(W0, 2, cz, W0, 4, cz + 1, "minecraft:glass_pane"); fill(W1, 2, cz, W1, 4, cz + 1, "minecraft:glass_pane")
-    # ceiling + recessed lights
+    fill(-1, 4, D0, 1, 4, D0, "minecraft:spruce_planks")
+    for cx in (-6, 4):
+        fill(cx, 2, D0, cx + 2, 4, D0, "minecraft:glass_pane")
+    for cz in (4, 5):
+        fill(W0, 2, cz, W0, 4, cz, "minecraft:glass_pane"); fill(W1, 2, cz, W1, 4, cz, "minecraft:glass_pane")
+    # tiled backsplash behind the counters
+    for x in range(-8, 9):
+        for y in (2, 3): put(x, y, D1, "minecraft:quartz_bricks")
     fill(W0, H + 1, D0, W1, H + 1, D1, "minecraft:smooth_quartz")
     for x in (-5, 0, 5):
-        for z in (4, 9): put(x, H + 1, z, "minecraft:sea_lantern")
-    # roof trim
+        for z in (3, 9): put(x, H + 1, z, "minecraft:sea_lantern")
     for x in range(W0, W1 + 1): put(x, H + 2, D0, "minecraft:spruce_slab"); put(x, H + 2, D1, "minecraft:spruce_slab")
     for z in range(D0, D1 + 1): put(W0, H + 2, z, "minecraft:spruce_slab"); put(W1, H + 2, z, "minecraft:spruce_slab")
 
-    # ---------------- back wall: stove line (z = 13)
-    BZ = 13
-    # base cabinets with countertop
-    for x in range(-8, 9): put(x, 1, BZ, "minecraft:spruce_planks"); put(x, 2, BZ, "minecraft:smooth_stone_slab[type=bottom]")
-    # 4 OCAK (stoves) + oven under + hood
-    for x in (-3, -1, 1, 3):
-        put(x, 1, BZ, "minecraft:blast_furnace[facing={F:front}]"); put(x, 2, BZ, "OCAK")
-        ENT.append(("vessel", x, 3.0, BZ, ["tava", "tencere", "tava", "cezve"][(x + 3) // 2]))
-    fill(-4, 5, BZ, 4, 5, BZ, "minecraft:polished_deepslate"); fill(-3, 4, BZ, 3, 4, BZ, "minecraft:iron_trapdoor[half=top,facing={F:front},open=false]")
-    fill(0, 6, BZ, 0, 6, BZ, "minecraft:iron_bars")
-    # backsplash tiles
-    for x in range(-8, 9):
-        if x in range(-4, 5): continue
-        put(x, 3, D1, "minecraft:cyan_glazed_terracotta" if x % 2 else "minecraft:white_glazed_terracotta")
-    # SINK (left of stove) + faucet
-    put(-6, 2, BZ, "minecraft:water_cauldron[level=3]"); put(-6, 3, D1 - 1, "minecraft:tripwire_hook[facing={F:front}]")
-    put(-6, 1, BZ, "minecraft:spruce_trapdoor[facing={F:front},half=bottom,open=true]")
-    # DISHWASHER (iron trapdoor front)
-    put(-7, 1, BZ, "minecraft:iron_block"); put(-7, 1, BZ - 1, "minecraft:iron_trapdoor[facing={F:back},open=true]")
-    # drying rack with plates
-    ENT.append(("deco", -7, 2.2, BZ, "tabak")); ENT.append(("deco", -8, 2.2, BZ, "tabak"))
-    # cutting boards on the counter (right of stove)
-    ENT.append(("vessel", 6, 2.5, BZ, "tahta")); ENT.append(("vessel", 7, 2.5, BZ, "tahta"))
-    ENT.append(("vessel", 5, 2.5, BZ, "tepsi"))
-    # knife block + utensil jar + spice rack + kettle (çaydanlık) + toaster + microwave
-    put(8, 3, BZ, "minecraft:spruce_slab[type=bottom]"); ENT.append(("deco", 8, 3.3, BZ, "bicak_up"))
-    put(-8, 3, BZ, "minecraft:decorated_pot[facing={F:front}]")
-    for x in range(-8, -4): put(x, 4, D1 - 1, "minecraft:spruce_slab[type=top]")
-    for i, k in enumerate(("pul_biber", "karabiber", "kimyon", "tuz")): ENT.append(("deco", -8 + i, 4.6, BZ, "ing_" + k))
-    put(6, 4, D1 - 1, "minecraft:spruce_slab[type=top]"); put(7, 4, D1 - 1, "minecraft:spruce_slab[type=top]")
-    ENT.append(("deco", 6, 4.62, BZ, "v_cezve")); ENT.append(("deco", 7, 4.62, BZ, "turk_cayi"))
-    # upper cabinets
-    for x in list(range(-8, -4)) + list(range(5, 9)):
-        put(x, 5, D1 - 1, "minecraft:spruce_trapdoor[facing={F:front},half=top,open=true]"); put(x, 5, D1, "minecraft:spruce_planks")
-    # hanging pans on the side
-    for x in (-4, 4):
-        put(x, 4, D1 - 1, "minecraft:tripwire_hook[facing={F:front}]")
-    ENT.append(("hang", -4, 3.4, BZ, "v_tava")); ENT.append(("hang", 4, 3.4, BZ, "v_tencere"))
-
-    # ---------------- left wall: FRIDGE + pantry + microwave
-    LX = -8
-    for z in (9, 10):  # double-door fridge (iron) with chests inside the wall look
-        fill(LX, 1, z, LX, 4, z, "minecraft:iron_block")
-        put(LX + 1, 2, z, f"minecraft:iron_door[facing={{F:right}},half=lower,hinge={'left' if z == 9 else 'right'}]")
-        put(LX + 1, 3, z, f"minecraft:iron_door[facing={{F:right}},half=upper,hinge={'left' if z == 9 else 'right'}]")
-        put(LX + 1, 1, z, "CHEST_FRIDGE" + str(z))
-    put(LX, 5, 9, "minecraft:white_concrete"); put(LX, 5, 10, "minecraft:white_concrete")
-    # pantry shelves (barrels) and microwave
-    for z in (6, 7):
-        put(LX, 1, z, "minecraft:barrel[facing={F:right}]"); put(LX, 2, z, "minecraft:barrel[facing={F:right}]")
-        put(LX, 3, z, "minecraft:spruce_planks")
-    put(LX, 4, 6, "minecraft:dropper[facing={F:right}]"); put(LX, 4, 7, "minecraft:smooth_stone")  # microwave + toaster block
-    ENT.append(("deco", LX + 0.6, 4.2, 7, "tost_ekmegi"))
-    put(LX, 1, 5, "CHEST_PANTRY")
-    # trash bin + mop corner
-    put(LX, 1, 2, "minecraft:composter"); put(LX, 1, 1, "minecraft:cauldron")
-
-    # ---------------- right wall: equipment chest, coffee corner, plants
-    RX = 8
-    put(RX, 1, 10, "CHEST_TOOLS"); put(RX, 1, 9, "CHEST_PLATES")
-    put(RX, 1, 7, "minecraft:spruce_planks"); put(RX, 2, 7, "minecraft:smooth_stone_slab"); put(RX, 3, 7, "COFFEE")
-    put(RX, 1, 6, "minecraft:spruce_planks"); put(RX, 2, 6, "minecraft:smooth_stone_slab")
-    ENT.append(("deco", RX, 2.5, 6, "turk_kahvesi_fincani"))
-    put(RX, 1, 3, "minecraft:potted_azalea_bush"); put(RX, 1, 2, "minecraft:potted_fern")
-    put(RX, 1, 1, "minecraft:potted_red_tulip")
-
-    # ---------------- island with bar stools (center)
-    for x in range(-3, 4):
-        put(x, 1, 8, "minecraft:spruce_planks"); put(x, 2, 8, "minecraft:polished_diorite_slab[type=bottom]")
-    for x in (-3, -1, 1, 3):
-        put(x, 1, 6, "minecraft:spruce_fence"); put(x, 2, 6, "minecraft:red_carpet")   # bar stools
-    ENT.append(("vessel", -2, 2.5, 8, "tahta")); ENT.append(("vessel", 2, 2.5, 8, "tahta"))
-    ENT.append(("deco", 0, 2.55, 8, "fruit"))      # fruit bowl
+    BZ = 13   # ---------------- back counter line (everything faces the door)
+    barrel(-8, 1, BZ, "Buzdolabı", "k_buzdolabi"); barrel(-8, 2, BZ, "Buzdolabı • Sebzelik")
+    barrel(-7, 1, BZ, "Tencere & Tava Dolabı", "k_dolap")
+    put(-6, 1, BZ, "minecraft:water_cauldron[level=3]"); ENT.append(("model", -6, 1, BZ, "k_lavabo", "front"))
+    barrel(-5, 1, BZ, "Bulaşık Makinesi", "k_bulasik")
+    barrel(-4, 1, BZ, "Çatal Bıçak Çekmecesi", "k_cekmece"); ENT.append(("model", -4, 2, BZ, "k_bicaklik", "front"))
+    barrel(-3, 1, BZ, "Baharat Dolabı", "k_dolap"); ENT.append(("model", -3, 2, BZ, "k_baharat", "front"))
+    for x, v in zip(range(-2, 3), ("tava", "tencere", "caydanlik", "cezve", "tepsi")):   # 5 OCAK
+        put(x, 1, BZ, "minecraft:smoker[facing={F:front},lit=false]")
+        ENT.append(("vessel", x, 2, BZ, v))
+        ENT.append(("model", x, 3.9, BZ, "k_aspirator", "front"))
+    for yy in (4.02, 5.02, 6.02): ENT.append(("model", 0, yy, BZ, "k_baca", "front"))
+    barrel(3, 1, BZ, "Tabak Çekmecesi", "k_cekmece"); ENT.append(("vessel", 3, 2, BZ, "kase"))
+    barrel(4, 1, BZ, "Alt Dolap", "k_dolap"); ENT.append(("vessel", 4, 2, BZ, "tahta"))
+    barrel(5, 1, BZ, "Alt Dolap 2", "k_dolap"); ENT.append(("model", 5, 2, BZ, "k_mikrodalga", "front"))
+    barrel(6, 1, BZ, "Kahvaltılık Dolabı", "k_dolap"); ENT.append(("model", 6, 2, BZ, "k_tost", "front"))
+    barrel(7, 1, BZ, "Kahve Dolabı", "k_dolap"); put(7, 2, BZ, "COFFEE")
+    barrel(8, 1, BZ, "Erzak Dolabı", "k_dolap"); ENT.append(("model", 8, 2, BZ, "k_kahve", "front"))
+    for x in list(range(-7, -2)) + list(range(3, 9)):            # upper cabinets
+        ENT.append(("model", x, 4.0, BZ, "k_ust_dolap", "front"))
+    # ---------------- left wall: tall pantry, trash
+    barrel(-8, 1, 11, "Kiler", "k_kiler", "right"); barrel(-8, 2, 11, "Kiler • Üst Raf")
+    barrel(-8, 1, 10, "Kiler 2", "k_kiler", "right"); barrel(-8, 2, 10, "Kiler 2 • Üst Raf")
+    barrel(-8, 1, 9, "Dondurucu", "k_buzdolabi", "right"); barrel(-8, 2, 9, "Dondurucu • Üst")
+    put(-8, 1, 2, "minecraft:composter")
+    # ---------------- right wall: tools, plates, plants
+    barrel(8, 1, 11, "Mutfak Eşyaları", "k_dolap", "left"); barrel(8, 1, 10, "Tabaklar & Çatal Bıçak", "k_dolap", "left")
+    ENT.append(("model", 8, 2, 11, "k_meyve", "left"))
+    put(8, 1, 3, "minecraft:potted_azalea_bush"); put(8, 1, 2, "minecraft:potted_fern"); put(8, 1, 1, "minecraft:potted_red_tulip")
+    # ---------------- island (cabinets face the stove side) + bar stools on the door side
+    for x in range(-2, 3): barrel(x, 1, 8, "Ada Dolabı" + (f" {x + 3}" if x else ""), "k_dolap", "back")
+    ENT.append(("vessel", -1, 2, 8, "tahta")); ENT.append(("vessel", 1, 2, 8, "kase")); ENT.append(("model", 0, 2, 8, "k_meyve", "back"))
+    for x in (-2, 0, 2): ENT.append(("model", x, 1, 6.6, "k_tabure", "back"))
     put(0, 6, 8, "minecraft:iron_chain"); put(0, 5, 8, "minecraft:lantern[hanging=true]")
-
-    # ---------------- dining table near the door
+    # ---------------- dining corner
     for x in (-6, -5):
         put(x, 1, 3, "minecraft:spruce_fence"); put(x, 2, 3, "minecraft:white_carpet")
     put(-7, 1, 3, "minecraft:spruce_stairs[facing={F:left}]"); put(-4, 1, 3, "minecraft:spruce_stairs[facing={F:right}]")
-    ENT.append(("deco", -6, 2.1, 3, "tabak")); ENT.append(("deco", -5, 2.1, 3, "tabak"))
-    put(5, 1, 2, "minecraft:spruce_fence"); put(5, 2, 2, "minecraft:white_carpet")
-    # rug + doormat
+    ENT.append(("deco", -6, 2.07, 3, "tabak")); ENT.append(("deco", -5, 2.07, 3, "tabak"))
     for x in (-1, 0, 1):
         for z in (1, 2): put(x, 1, z, "minecraft:brown_carpet")
-    # porch: lantern posts + sign
     for x in (-3, 3):
         fill(x, 1, -2, x, 2, -2, "minecraft:spruce_fence"); put(x, 3, -2, "minecraft:lantern")
     ENT.append(("sign", 0, 5.4, -1, None))
-    # shopkeeper (sells all ingredients and kitchen tools)
     ENT.append(("manav", 6, 1, 4, None))
 
 def kitchen_chests():
-    keys = list(ING.keys())
-    def chest(items):
-        return "{Items:[" + ",".join(f"{{Slot:{i}b,{it[1:]}" for i, it in enumerate(items)) + "]}"
-    fridge1 = [ing_nbt(k, 32) for k in keys[:27]]
-    fridge2 = [ing_nbt(k, 32) for k in keys[27:54]]
-    van = ['{id:"minecraft:egg",count:16}', '{id:"minecraft:milk_bucket",count:1}', '{id:"minecraft:milk_bucket",count:1}',
-           '{id:"minecraft:milk_bucket",count:1}', '{id:"minecraft:water_bucket",count:1}', '{id:"minecraft:water_bucket",count:1}',
-           '{id:"minecraft:sugar",count:64}', '{id:"minecraft:honey_bottle",count:16}', '{id:"minecraft:bread",count:32}',
-           '{id:"minecraft:beef",count:32}', '{id:"minecraft:chicken",count:32}', '{id:"minecraft:mutton",count:32}',
-           '{id:"minecraft:cod",count:32}', '{id:"minecraft:salmon",count:32}', '{id:"minecraft:potato",count:64}',
-           '{id:"minecraft:carrot",count:64}', '{id:"minecraft:apple",count:32}', '{id:"minecraft:cocoa_beans",count:32}',
-           '{id:"minecraft:wheat",count:64}', '{id:"minecraft:brown_mushroom",count:32}', '{id:"minecraft:sweet_berries",count:64}',
-           '{id:"minecraft:pumpkin",count:16}', '{id:"minecraft:melon_slice",count:32}', '{id:"minecraft:beetroot",count:32}',
-           '{id:"minecraft:kelp",count:32}']
-    pantry = [ing_nbt(k, 32) for k in keys[54:]] + van
-    pantry = pantry[:27]
-    rest_van = van[27 - len([ing_nbt(k, 32) for k in keys[54:]]):]
-    tools = [vessel_nbt(v, 4) for v in VESSELS] + [OCAK_NBT.replace("count:1", "count:4")]
-    for k in ("kasik", "catal", "bicak"):
-        tools.append(tf.tool_snbt(k, 8))
-    plates = [tf.tool_snbt("tabak", 64), tf.tool_snbt("tabak", 64)] + rest_van
-    return {"CHEST_FRIDGE9": chest(fridge1), "CHEST_FRIDGE10": chest(fridge2), "CHEST_PANTRY": chest(pantry),
-            "CHEST_TOOLS": chest(tools), "CHEST_PLATES": chest(plates[:27])}
+    G = {
+        "Buzdolabı": I("yogurt", "suzme", "yogurt_mayasi", "peynir", "kasar", "tereyagi", "kaymak", "krema", "maya", "hamur", "yufka", "sucuk_ham",
+                       "salca", "zeytin") + [EGG] * 1 + [MILK] * 3,
+        "Buzdolabı • Sebzelik": I("domates", "sogan", "sarimsak", "limon", "portakal", "nar", "biber", "kirmizi_biber", "patlican", "kabak",
+                                  "salatalik", "maydanoz", "nane", "dereotu", "ispanak", "marul", "mantar", "misir", "bezelye", "bamya", "pirasa",
+                                  "lahana", "taze_fasulye", "kayisi", "incir", "uzum", "kusburnu"),
+        "Dondurucu": I("kiyma", "karides", "midye", "kalamar") + [BEEF, CHICKEN, MUTTON, COD, SALMON],
+        "Kiler": I("un", "pirinc", "bulgur", "mercimek", "nohut", "fasulye", "makarna", "sehriye", "irmik", "nisasta", "tel_kadayif",
+                   "asma_yapragi", "kestane") + [SUGAR, HONEY, BREAD, POTATO, CARROT, APPLE, WHEAT],
+        "Kiler 2": I("kahve", "kahve_cig", "kahve_kavrulmus", "cay", "ihlamur", "adacayi", "gul", "fistik", "ceviz_ic", "findik_ic", "susam",
+                     "tahin", "pekmez", "zeytinyagi", "sirke", "cikolata", "kakao_tozu", "salep", "vanilya", "kabartma_tozu")
+                   + ["minecraft:cocoa_beans", "minecraft:sweet_berries", "minecraft:beetroot", PUMPKIN],
+        "Baharat Dolabı": I("tuz", "pul_biber", "karabiber", "kimyon", "nane_kuru", "sumak", "isot", "tarcin"),
+        "Tencere & Tava Dolabı": ["VESSEL:" + v for v in VESSELS] + ["OCAK"],
+        "Çatal Bıçak Çekmecesi": ["TOOL:kasik", "TOOL:catal", "TOOL:bicak"],
+        "Bulaşık Makinesi": ["TOOL:tabak"] * 2,
+        "Tabak Çekmecesi": ["TOOL:tabak"] * 3,
+        "Tabaklar & Çatal Bıçak": ["TOOL:tabak", "TOOL:kasik", "TOOL:catal", "TOOL:bicak"],
+        "Mutfak Eşyaları": ["VESSEL:" + v for v in VESSELS] + ["OCAK"],
+        "Kahvaltılık Dolabı": I("peynir", "kasar", "zeytin", "kaymak", "tereyagi") + [HONEY, BREAD, BREAD, EGG],
+        "Erzak Dolabı": ["minecraft:water_bucket"] * 4 + ["minecraft:milk_bucket"] * 2 + ["minecraft:glass_bottle"],
+    }
+    def item(k):
+        if k.startswith("ing:"): return ing_nbt(k[4:], 32)
+        if k.startswith("VESSEL:"): return vessel_nbt(k[7:], 2)
+        if k == "OCAK": return OCAK_NBT.replace("count:1", "count:4")
+        if k.startswith("TOOL:"): return tf.tool_snbt(k[5:], 64 if k.endswith("tabak") else 16)
+        n = 1 if k.endswith("_bucket") else (16 if k in (EGG, HONEY) else 64)
+        return f'{{id:"{k}",count:{n}}}'
+    out = {}
+    for title, keys in G.items():
+        assert len(keys) <= 27, (title, len(keys))
+        out[title] = "{Items:[" + ",".join(f"{{Slot:{i}b,{item(k)[1:]}" for i, k in enumerate(keys)) + "]"
+    missing = [k for k in ING if not any(("ing:" + k) in v for v in G.values())]
+    if missing: print("ingredients not stored in the kitchen:", missing)
+    return out
 
 DIRS = {"south": ((0, 1), (-1, 0), 180.0), "north": ((0, -1), (1, 0), 0.0), "east": ((1, 0), (0, 1), 90.0), "west": ((-1, 0), (0, -1), -90.0)}
 NAME = {(0, 1): "south", (0, -1): "north", (1, 0): "east", (-1, 0): "west"}
 FLAT = "left_rotation:[-0.7071f,0f,0f,0.7071f],right_rotation:[0f,0f,0f,1f]"
 UPR = "left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f]"
+# vessel display (must match Kitchen.java): model bottom on the surface, heat vessels sit on the pan supports
+LIFT = {"tava": .0625, "tencere": .0625, "tepsi": .0625, "cezve": .0625, "caydanlik": .0625, "tahta": .006, "kase": .006}
+HIT = {"tencere": .5, "caydanlik": .8, "cezve": .35, "kase": .4}
+
+def yawq(dx, dz):
+    """quaternion that turns the model front (-Z) towards (dx, dz)"""
+    import math
+    th = math.atan2(-dx, -dz)
+    return f"[0f,{math.sin(th / 2):.4f}f,0f,{math.cos(th / 2):.4f}f]"
 
 def item_nbt_for(key):
     if key.startswith("ing_"): return ing_nbt(key[4:], 1)
-    if key.startswith("v_"): return vessel_nbt(key[2:])
     if key == "tabak": return tf.tool_snbt("tabak", 1)
-    if key == "bicak_up": return tf.tool_snbt("bicak", 1)
-    if key == "fruit": return '{id:"minecraft:apple",count:1}'
     for row in list(tf.F) + [(w[0], w[1]) for w in WORLD]:
         if tf.slug(row[0]) == key:
             return tf.item_snbt(row[0], row[1], key).replace("count:16", "count:1") if row[1] in tf.CATS else '{id:"minecraft:bread",count:1}'
     return '{id:"minecraft:bread",count:1}'
 
+def model_item(k): return f'{{id:"minecraft:paper",count:1,components:{{"minecraft:custom_model_data":{{strings:["{k}"]}}}}}}'
+
 def emit(d, chests):
     f, r, yaw = DIRS[d]
     def w(x, z): return (r[0] * x + f[0] * z, r[1] * x + f[1] * z)
-    def face(nm):
-        v = {"back": f, "front": (-f[0], -f[1]), "right": r, "left": (-r[0], -r[1])}[nm]
-        return NAME[v]
+    def vec(nm): return {"back": f, "front": (-f[0], -f[1]), "right": r, "left": (-r[0], -r[1])}[nm]
+    def face(nm): return NAME[vec(nm)]
     def state(s):
         for k in ("front", "back", "left", "right"): s = s.replace("{F:%s}" % k, face(k))
         return s
@@ -614,41 +703,42 @@ def emit(d, chests):
     def pos(x, y, z):
         wx, wz = w(x, z); return f"{tl(wx)} {tl(y)} {tl(wz)}"
     def fpos(x, y, z):
-        wx, wz = w(x, z); return f"~{wx + .5:.2f} ~{y:.2f} ~{wz + .5:.2f}"
+        wx, wz = w(x, z); return f"~{wx + .5:.3f} ~{y:.3f} ~{wz + .5:.3f}"
     L = ["# generated by tools/turk_kitchen.py",
          "kill @e[type=!player,tag=astro_kit,distance=..30]",
          f"fill {pos(-10,1,-3)} {pos(10,10,6)} minecraft:air", f"fill {pos(-10,1,7)} {pos(10,10,15)} minecraft:air"]
     for (x, y, z), s in sorted(B.items(), key=lambda kv: (kv[0][1], kv[0][0], kv[0][2])):
         if s == "minecraft:air": continue
-        if s == "OCAK":
-            L.append(f'setblock {pos(x,y,z)} minecraft:smoker[facing={face("front")}]{{CustomName:{{text:"Ocak",color:"gold",bold:true}}}}')
-        elif s == "COFFEE":
+        if s == "COFFEE":
             L.append(f'setblock {pos(x,y,z)} minecraft:brewing_stand{{CustomName:{{text:"Kahve Makinesi",color:"gold",bold:true}}}}')
-        elif s.startswith("CHEST_"):
-            title = {"CHEST_FRIDGE9": "Buzdolabı 1", "CHEST_FRIDGE10": "Buzdolabı 2", "CHEST_PANTRY": "Kiler",
-                     "CHEST_TOOLS": "Mutfak Eşyaları", "CHEST_PLATES": "Tabaklar & Erzak"}[s]
-            body = chests[s][:-1] + f',CustomName:{{text:"{title}",color:"gold",bold:true}}}}'
-            L.append(f"setblock {pos(x,y,z)} minecraft:chest[facing={face('left') if x > 0 else face('right')}]{body}")
+        elif s.startswith("BARREL:"):
+            title = s[7:]
+            body = chests.get(title, "{Items:[]")
+            L.append(f'setblock {pos(x,y,z)} minecraft:barrel[facing=up]{body},CustomName:{{text:"{tf.esc(title)}",color:"gold",bold:true}}}}')
         else:
             L.append(f"setblock {pos(x,y,z)} {state(s)}")
-    for kind, x, y, z, data in ENT:
+    for e in ENT:
+        kind, x, y, z, data = e[:5]
         p = fpos(x, y, z)
         if kind == "vessel":
-            L.append(f'summon minecraft:item_display {p} {{Tags:["astro_kit","astro_v_vessel"],item:{vessel_nbt(data)},billboard:"fixed",'
-                     f'transformation:{{{FLAT},translation:[0f,0.02f,0f],scale:[0.75f,0.75f,0.75f]}}}}')
-            L.append(f'summon minecraft:interaction {p} {{Tags:["astro_kit"],width:0.7f,height:0.3f,response:1b,CustomName:"astro:v:{data}:i:"}}')
-        elif kind in ("deco", "hang"):
-            rot, bb, sc = (FLAT, '"fixed"', "0.5f") if kind == "deco" else (UPR, '"vertical"', "0.6f")
-            if data in ("bicak_up", "v_cezve", "turk_cayi", "turk_kahvesi_fincani", "tost_ekmegi") or data.startswith("ing_"):
-                rot, bb, sc = UPR, '"vertical"', "0.4f"
-            L.append(f'summon minecraft:item_display {p} {{Tags:["astro_kit"],item:{item_nbt_for(data)},billboard:{bb},'
-                     f'transformation:{{{rot},translation:[0f,0f,0f],scale:[{sc},{sc},{sc}]}}}}')
+            q = yawq(*vec("front"))
+            L.append(f'summon minecraft:item_display {p} {{Tags:["astro_kit","astro_v_vessel"],item:{vessel_nbt(data)},'
+                     f'transformation:{{left_rotation:{q},right_rotation:[0f,0f,0f,1f],translation:[0f,{0.5 + LIFT[data]:.4f}f,0f],scale:[1f,1f,1f]}}}}')
+            L.append(f'summon minecraft:interaction {p} {{Tags:["astro_kit"],width:0.75f,height:{HIT.get(data, .3)}f,response:1b,CustomName:"astro:v:{data}:i:"}}')
+        elif kind == "model":
+            q = yawq(*vec(e[5]))
+            sc = "1.004f" if data in ("k_buzdolabi", "k_dolap", "k_cekmece", "k_bulasik", "k_kiler") else "1f"
+            L.append(f'summon minecraft:item_display {p} {{Tags:["astro_kit"],item:{model_item(data)},'
+                     f'transformation:{{left_rotation:{q},right_rotation:[0f,0f,0f,1f],translation:[0f,0.5f,0f],scale:[{sc},{sc},{sc}]}}}}')
+        elif kind == "deco":
+            L.append(f'summon minecraft:item_display {p} {{Tags:["astro_kit"],item:{item_nbt_for(data)},'
+                     f'transformation:{{{FLAT},translation:[0f,0f,0f],scale:[0.5f,0.5f,0.5f]}}}}')
         elif kind == "sign":
             L.append(f'summon minecraft:text_display {p} {{Tags:["astro_kit"],billboard:"vertical",background:0,shadow:1b,'
-                     f'transformation:{{{UPR},translation:[0f,0f,0f],scale:[2.6f,2.6f,2.6f]}},text:{{text:"🍳 ASTRO MUTFAK 🍳",color:"gold",bold:true}}}}')
+                     f'transformation:{{{UPR},translation:[0f,0f,0f],scale:[2.6f,2.6f,2.6f]}},text:{{text:"\U0001f373 ASTRO MUTFAK \U0001f373",color:"gold",bold:true}}}}')
             wx, wz = w(x, z)
             L.append(f'summon minecraft:text_display ~{wx + .5:.2f} ~{y - 0.8:.2f} ~{wz + .5:.2f} {{Tags:["astro_kit"],billboard:"vertical",background:0,'
-                     f'transformation:{{{UPR},translation:[0f,0f,0f],scale:[1.1f,1.1f,1.1f]}},text:{{text:"Tava/tencereyi Ocak üstüne koy • Malzemeyi ekle • Boş elle sağ tık = PİŞİR • /tarif",color:"yellow"}}}}')
+                     f'transformation:{{{UPR},translation:[0f,0f,0f],scale:[1.0f,1.0f,1.0f]}},text:{{text:"Ocak\'ı yak: Shift + boş elle Ocak\'a sağ tık • Malzemeyi kaba at • Boş elle sağ tık = PİŞİR • /tarif",color:"yellow"}}}}')
         elif kind == "manav":
             trades = []
             for k in ING:
@@ -656,12 +746,14 @@ def emit(d, chests):
             for v in VESSELS:
                 trades.insert(0, f'{{buy:{{id:"minecraft:emerald",count:2}},sell:{vessel_nbt(v)},maxUses:2147483647,rewardExp:0b,xp:0,priceMultiplier:0f}}')
             trades.insert(0, f'{{buy:{{id:"minecraft:emerald",count:4}},sell:{OCAK_NBT},maxUses:2147483647,rewardExp:0b,xp:0,priceMultiplier:0f}}')
-            L.append(f'summon minecraft:villager {p.replace("~1.00", "~1")} {{Tags:["astro_kit"],NoAI:1b,Invulnerable:1b,Silent:1b,PersistenceRequired:1b,'
+            L.append(f'summon minecraft:villager {p.replace("~1.000", "~1")} {{Tags:["astro_kit"],NoAI:1b,Invulnerable:1b,Silent:1b,PersistenceRequired:1b,'
                      f'CustomNameVisible:1b,CustomName:{{text:"Manav & Bakkal Ali",color:"gold",bold:true}},Rotation:[{yaw}f,0f],'
                      f'VillagerData:{{profession:"minecraft:farmer",level:5,type:"minecraft:plains"}},Offers:{{Recipes:[{",".join(trades)}]}}}}')
     L += ["particle minecraft:happy_villager ~ ~3 ~ 6 2 6 0 150 force", "playsound minecraft:ui.toast.challenge_complete master @a ~ ~ ~ 2 1"]
     C = ["# generated by tools/turk_kitchen.py",
          "kill @e[type=!player,tag=astro_kit,distance=..30]", "kill @e[type=!player,tag=astro_pl,distance=..20]",
+         "kill @e[type=item_display,tag=astro_v_vessel,distance=..30]", "kill @e[type=item_display,tag=astro_v_ing,distance=..30]",
+         "kill @e[type=item_display,tag=astro_v_res,distance=..30]", "kill @e[type=item_display,tag=astro_v_fx,distance=..30]",
          f"fill {pos(-10,1,-3)} {pos(10,10,6)} minecraft:air", f"fill {pos(-10,1,7)} {pos(10,10,15)} minecraft:air",
          f"fill {pos(-10,0,-3)} {pos(10,0,15)} minecraft:grass_block",
          "playsound minecraft:entity.generic.explode master @a ~ ~ ~ 2 0.8"]
@@ -682,7 +774,8 @@ def main():
         L, C = emit(d, chests)
         open(os.path.join(out, f"kitchen_build_{d}.mcfunction"), "w", encoding="utf-8").write("\n".join(L) + "\n")
         open(os.path.join(out, f"kitchen_clear_{d}.mcfunction"), "w", encoding="utf-8").write("\n".join(C) + "\n")
-    print(f"kitchen: {len(recipes)} recipes, {len(ING)} ingredients, {len(B)} blocks, {len(ENT)} entities")
+    from collections import Counter
+    print(f"kitchen: {len(recipes)} recipes {dict(Counter(r[0] for r in recipes))}, {len(ING)} ingredients, {len(B)} blocks, {len(ENT)} entities")
 
 if __name__ == "__main__":
     main()
