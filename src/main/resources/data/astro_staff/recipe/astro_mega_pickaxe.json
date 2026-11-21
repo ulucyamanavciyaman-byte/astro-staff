@@ -1,0 +1,55 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "GBG",
+    "PNP",
+    "GBG"
+  ],
+  "key": {
+    "G": "minecraft:enchanted_golden_apple",
+    "P": "minecraft:netherite_pickaxe",
+    "N": "minecraft:beacon",
+    "B": {
+      "fabric:type": "fabric:components",
+      "base": "minecraft:enchanted_book",
+      "components": {
+        "minecraft:stored_enchantments": {
+          "minecraft:efficiency": 5
+        }
+      }
+    }
+  },
+  "result": {
+    "id": "minecraft:netherite_pickaxe",
+    "count": 1,
+    "components": {
+      "minecraft:custom_name": {
+        "text": "Astro Mega Pickaxe [3x3]",
+        "color": "light_purple",
+        "bold": true,
+        "italic": false
+      },
+      "minecraft:lore": [
+        {
+          "text": "Mines a 3x3 area and breaks bedrock!",
+          "color": "aqua",
+          "italic": false
+        },
+        {
+          "text": "Hold it and type /megasize 5 to change the size",
+          "color": "gray",
+          "italic": false
+        }
+      ],
+      "minecraft:enchantments": {
+        "minecraft:efficiency": 6,
+        "minecraft:unbreaking": 10,
+        "minecraft:mending": 1,
+        "minecraft:fortune": 3
+      },
+      "minecraft:custom_data": "{astro_mega:1b,size:3}",
+      "minecraft:rarity": "epic"
+    }
+  }
+}
