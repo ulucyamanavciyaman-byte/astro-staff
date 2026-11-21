@@ -108,6 +108,7 @@ public class AstroStaff implements ModInitializer {
         MegaPick.init();
         OnePunch.init();
         Coffee.init();
+        TurkFood.init();
         ServerLifecycleEvents.SERVER_STARTED.register(server -> SERVER = server);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> register(dispatcher));
         // after dying, everyone goes to the custom spawn (not after leaving the End)
