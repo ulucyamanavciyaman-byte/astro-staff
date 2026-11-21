@@ -9,6 +9,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
@@ -73,7 +74,7 @@ public final class Plate {
                 .withStyle(st -> st.withColor(ChatFormatting.GOLD).withBold(true).withItalic(false)));
         food.shrink(1);
         plate.shrink(1);
-        p.getInventory().placeItemBackInInventory(plated);
+        if (!p.getInventory().add(plated)) p.level().addFreshEntity(new ItemEntity(p.level(), p.getX(), p.getY(), p.getZ(), plated));
         String n2 = p.getName().getString();
         run(p.level().getServer(), "execute as " + n2 + " at @s run playsound minecraft:block.decorated_pot.place master @a ~ ~ ~ 1 1.2");
         p.sendSystemMessage(Component.literal("§6🍽 " + foodName + " tabağa kondu! §7Sol eline kaşık/çatal/bıçak al ve sağ tıkla."));
