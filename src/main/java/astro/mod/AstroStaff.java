@@ -105,6 +105,7 @@ public class AstroStaff implements ModInitializer {
     @Override
     public void onInitialize() {
         loadSpawn();
+        MegaPick.init();
         ServerLifecycleEvents.SERVER_STARTED.register(server -> SERVER = server);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> register(dispatcher));
         // after dying, everyone goes to the custom spawn (not after leaving the End)
