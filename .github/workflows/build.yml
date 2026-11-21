@@ -16,6 +16,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: current
+      - name: Generate Turkish food pack
+        run: python3 tools/turk_food.py
       - name: Build
         run: gradle build --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
@@ -27,4 +29,6 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: Astro Staff mod build ${{ github.run_number }}
-          files: build/libs/*.jar
+          files: |
+            build/libs/*.jar
+            build/astro_food_pack.zip
