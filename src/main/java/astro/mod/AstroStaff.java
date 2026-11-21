@@ -110,7 +110,7 @@ public class AstroStaff implements ModInitializer {
         Coffee.init();
         TurkFood.init();
         Restaurant.init();
-        Plate.init();
+        Plate.init(); Kitchen.init();
         ServerLifecycleEvents.SERVER_STARTED.register(server -> SERVER = server);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> register(dispatcher));
         // after dying, everyone goes to the custom spawn (not after leaving the End)
