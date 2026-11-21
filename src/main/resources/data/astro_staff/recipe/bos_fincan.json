@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:flower_pot",
+    "minecraft:white_dye"
+  ],
+  "result": {
+    "id": "minecraft:flower_pot",
+    "count": 1,
+    "components": {
+      "minecraft:custom_name": {
+        "text": "Boş Fincan",
+        "color": "white",
+        "bold": false,
+        "italic": false
+      },
+      "minecraft:lore": [
+        {
+          "text": "Kahve makinesine sağ tıkla",
+          "color": "gray",
+          "bold": false,
+          "italic": false
+        }
+      ],
+      "minecraft:custom_data": "{astro_cup:1b}"
+    }
+  }
+}
