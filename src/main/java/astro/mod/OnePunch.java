@@ -9,6 +9,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -42,7 +43,7 @@ public final class OnePunch {
     private static final List<Task> TASKS = new ArrayList<>();
     private static final Set<UUID> BUSY = new HashSet<>();
 
-    private static void later(int ticks, Runnable r) { TASKS.add(new Task(ticks, r)); }
+    static void later(int ticks, Runnable r) { TASKS.add(new Task(ticks, r)); }
 
     private static void tick(MinecraftServer server) {
         if (TASKS.isEmpty()) return;
@@ -187,7 +188,7 @@ public final class OnePunch {
             // launch the target (~100 blocks of knockback)
             if (target.isAlive()) {
                 target.setDeltaMovement(fdx * 8.0, 0.6, fdz * 8.0);
-                target.hurtMarked = true;
+                if (target instanceof ServerPlayer tp) tp.connection.send(new ClientboundSetEntityMotionPacket(tp));
             }
             at(level, p.x, p.y, p.z, "effect clear @a[distance=..80] minecraft:darkness");
         });
