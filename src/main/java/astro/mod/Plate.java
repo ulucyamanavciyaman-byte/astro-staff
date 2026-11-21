@@ -73,7 +73,7 @@ public final class Plate {
                 .withStyle(st -> st.withColor(ChatFormatting.GOLD).withBold(true).withItalic(false)));
         food.shrink(1);
         plate.shrink(1);
-        if (!p.getInventory().add(plated)) p.drop(plated, false);
+        p.getInventory().placeItemBackInInventory(plated);
         String n2 = p.getName().getString();
         run(p.level().getServer(), "execute as " + n2 + " at @s run playsound minecraft:block.decorated_pot.place master @a ~ ~ ~ 1 1.2");
         p.sendSystemMessage(Component.literal("§6🍽 " + foodName + " tabağa kondu! §7Sol eline kaşık/çatal/bıçak al ve sağ tıkla."));
@@ -83,7 +83,9 @@ public final class Plate {
         CompoundTag t = tag(plated);
         int n = t.getIntOr("pn", 4) + 2;
         float s = t.getFloatOr("ps", 4f) + 2f;
-        p.getFoodData().eat(n, s / (n * 2f));
+        var fd = p.getFoodData();
+        fd.setFoodLevel(Math.min(20, fd.getFoodLevel() + n));
+        fd.setSaturation(Math.min((float) fd.getFoodLevel(), fd.getSaturationLevel() + s));
         Component old = plated.get(DataComponents.CUSTOM_NAME);
         String name = old != null ? old.getString().replace("🍽 ", "").replace(" (Tabakta)", "") : "Yemek";
         plated.shrink(1);
