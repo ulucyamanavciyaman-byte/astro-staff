@@ -114,7 +114,7 @@ def build():
             ENT.append((tx, 2.12, tz, "table", None))
     # hanging lamps
     for (x, z) in ((-6, 3), (-6, 7), (-6, 10), (6, 3), (6, 7), (6, 10), (0, 3), (0, 7), (0, 11), (-3, 14), (3, 14)):
-        put(x, H, z, "minecraft:chain"); put(x, H - 1, z, "minecraft:lantern[hanging=true]")
+        put(x, H, z, "minecraft:iron_chain"); put(x, H - 1, z, "minecraft:lantern[hanging=true]")
     # ---------------- kitchen / counter
     for x in range(-9, 10):
         put(x, 1, 12, "minecraft:dark_oak_planks"); put(x, 2, 12, "minecraft:smooth_quartz_slab")
