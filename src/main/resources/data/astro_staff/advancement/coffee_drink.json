@@ -1,0 +1,18 @@
+{
+  "criteria": {
+    "drink": {
+      "trigger": "minecraft:consume_item",
+      "conditions": {
+        "item": {
+          "items": "minecraft:flower_pot",
+          "predicates": {
+            "minecraft:custom_data": "{astro_coffee:1b}"
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "astro_staff:coffee_drink"
+  }
+}
