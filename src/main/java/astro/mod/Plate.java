@@ -226,7 +226,6 @@ public final class Plate {
             OnePunch.later(t0 + 6, () -> run(s, D + "run tp " + utU + " " + xyz(mouth)));
             // BITE
             OnePunch.later(t0 + 12, () -> {
-                if (p.isAlive()) p.swing(InteractionHand.MAIN_HAND);
                 run(s, D + "run playsound " + sound + " master @a " + xyz(mouth) + " 1 " + (0.9f + bite * 0.1f));
                 run(s, D + "run particle minecraft:item_slime " + xyz(mouth) + " 0.06 0.04 0.06 0 0");
                 run(s, D + "run particle minecraft:composter " + xyz(mouth) + " 0.12 0.06 0.12 0 6");
