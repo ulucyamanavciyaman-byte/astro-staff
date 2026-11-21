@@ -1,0 +1,34 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "III",
+    "IBI",
+    "ICI"
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "B": "minecraft:brewing_stand",
+    "C": "minecraft:cocoa_beans"
+  },
+  "result": {
+    "id": "minecraft:brewing_stand",
+    "count": 1,
+    "components": {
+      "minecraft:custom_name": {
+        "text": "Kahve Makinesi",
+        "color": "gold",
+        "bold": true,
+        "italic": false
+      },
+      "minecraft:lore": [
+        {
+          "text": "Elinde boş fincan + çantanda kahve paketi ve su ile sağ tıkla",
+          "color": "gray",
+          "bold": false,
+          "italic": false
+        }
+      ]
+    }
+  }
+}
