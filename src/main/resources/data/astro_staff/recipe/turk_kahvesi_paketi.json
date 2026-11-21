@@ -1,0 +1,33 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:cocoa_beans",
+    "minecraft:cocoa_beans",
+    "minecraft:cocoa_beans",
+    "minecraft:cocoa_beans",
+    "minecraft:paper"
+  ],
+  "result": {
+    "id": "minecraft:brown_dye",
+    "count": 1,
+    "components": {
+      "minecraft:item_model": "minecraft:brown_bundle",
+      "minecraft:custom_name": {
+        "text": "Türk Kahvesi Paketi",
+        "color": "gold",
+        "bold": true,
+        "italic": false
+      },
+      "minecraft:lore": [
+        {
+          "text": "Taze çekilmiş, 100g",
+          "color": "gray",
+          "bold": false,
+          "italic": false
+        }
+      ],
+      "minecraft:custom_data": "{astro_coffee_pkg:1b}"
+    }
+  }
+}
