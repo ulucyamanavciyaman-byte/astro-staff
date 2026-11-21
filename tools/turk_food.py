@@ -193,6 +193,7 @@ F = [
  ("Türk Kahvesi Fincanı","icecek","3a2418","d8c098","cup"),("Nane Limon","icecek","c8d880","6a9a3a","tea"),
  ("Süt","icecek","fbfbf8","e8e8e0"),("Portakal Suyu","icecek","f8a020","f8f0d0"),
  ("Nar Suyu","icecek","a8142a","f6f0e8"),("Maden Suyu","icecek","d8f0f8","f8f8f8"),
+("Su","icecek","bfe3f5","f8f8f8"),
  ("Soda","icecek","e0f4f8","f8f8f8"),("Kayısı Suyu","icecek","f0a030","f8f0d0"),
  # --- kuruyemiş & şekerleme
  ("Leblebi","kuru","e8c870","d8b060"),("Ay Çekirdeği","kuru","3a3a3a","e8e8e0"),
@@ -204,6 +205,21 @@ F = [
  ("Pamuk Şeker","kuru","f8a0c8","f8f0f6","nest"),("Kuru Üzüm","kuru","5a2a3a","8a4a5a"),
  ("Badem","kuru","c8905a","e8c8a0"),("Kavrulmuş Nohut","kuru","d8a850","b8803a"),
 ]
+
+# table-ware: key -> (name, base item, shape, lore)
+TOOLS = {
+    "tabak": ("Tabak", "bowl", "plate_empty", "Ana elinde tut, yemek sol elinde: sağ tıkla = tabağa koy"),
+    "kasik": ("Kaşık", "stick", "spoon", "Sol elinde tut, tabaktaki yemeğe sağ tıkla = ye"),
+    "catal": ("Çatal", "stick", "fork", "Sol elinde tut, tabaktaki yemeğe sağ tıkla = ye"),
+    "bicak": ("Bıçak", "stick", "knife", "Sol elinde tut, tabaktaki yemeğe sağ tıkla = ye"),
+}
+
+def tool_snbt(key, count):
+    name, base, _, lore = TOOLS[key]
+    return (f'{{id:"minecraft:{base}",count:{count},components:{{'
+            f'"minecraft:custom_name":{{text:"{name}",color:"white",bold:true,italic:false}},'
+            f'"minecraft:lore":[{{text:"{lore}",color:"gray",italic:false}}],'
+            f'"minecraft:custom_model_data":{{strings:["{key}"]}},"minecraft:custom_data":{{astro_tool:"{key}"}}}}}}')
 
 # ----------------------------------------------------------------------------- tiny png writer
 def png(path, px):
@@ -501,6 +517,22 @@ def draw(shape, a, b, seed):
         im.rect(4, 5, 11, 12, (240, 238, 232)); im.rect(12, 7, 13, 10, (240, 238, 232))
         im.ellipse(7.5, 5.5, 3.6, 1.3, a, light=b); im.rect(4, 12, 11, 12, (210, 206, 200))
         im.set(6, 8, (200, 40, 40)); im.set(9, 9, (40, 90, 200))
+    elif shape == "plate_empty":
+        im.ellipse(8, 9, 7.6, 4.6, WHITE, dark=PLATE_D)
+        im.ellipse(8, 8.6, 5.4, 3, (232, 230, 226)); im.ellipse(8, 8.4, 3.6, 1.8, (240, 238, 234))
+        for x in range(2, 15, 3): im.set(x, 9 if x in (2, 14) else 6 if x == 8 else 7, (40, 90, 170))
+    elif shape == "spoon":
+        for i in range(9): im.set(3 + i, 13 - i, (200, 200, 210)); im.set(4 + i, 13 - i, (170, 170, 182))
+        im.ellipse(12.2, 3.8, 2.4, 2.8, (215, 215, 225), light=(245, 245, 250), dark=(160, 160, 172))
+    elif shape == "fork":
+        for i in range(8): im.set(3 + i, 13 - i, (200, 200, 210)); im.set(4 + i, 13 - i, (170, 170, 182))
+        im.rect(10, 4, 12, 6, (205, 205, 215))
+        for k in range(3): im.set(11 + k, 2 + k, (220, 220, 230)); im.set(10 + k, 1 + k, (220, 220, 230)) if k < 2 else None
+        im.set(13, 2, (220, 220, 230)); im.set(12, 1, (220, 220, 230)); im.set(14, 3, (220, 220, 230))
+    elif shape == "knife":
+        for i in range(5): im.rect(2 + i, 13 - i, 3 + i, 13 - i, (110, 70, 40))
+        for i in range(8):
+            im.set(7 + i, 8 - i, (225, 225, 235)); im.set(7 + i, 9 - i, (195, 195, 205)); im.set(8 + i, 9 - i, (160, 160, 172))
     im.outline()
     return im.p
 
@@ -548,6 +580,12 @@ def main():
             z.writestr(f"assets/astro/models/item/food/{sid}.json",
                        json.dumps({"parent": "minecraft:item/generated", "textures": {"layer0": f"astro:item/food/{sid}"}}))
             by_base.setdefault(CATS[cat][1], []).append(sid)
+        for j, (key, (tname, tbase, tshape, _)) in enumerate(TOOLS.items()):
+            z.writestr(f"assets/astro/textures/item/food/{key}.png", png(None, draw(tshape, (240, 240, 240), (200, 200, 200), 900 + j)))
+            z.writestr(f"assets/astro/models/item/food/{key}.json",
+                       json.dumps({"parent": "minecraft:item/handheld" if tbase == "stick" else "minecraft:item/generated",
+                                   "textures": {"layer0": f"astro:item/food/{key}"}}))
+            by_base.setdefault(tbase, []).append(key)
         for base, sids in by_base.items():
             z.writestr(f"assets/minecraft/items/{base}.json", json.dumps({"model": {
                 "type": "minecraft:select", "property": "minecraft:custom_model_data", "index": 0,
@@ -570,6 +608,9 @@ def main():
             title = meta[0] + (f" {part // 27 + 1}" if len(items) > 27 else "")
             content = ",".join(f'{{slot:{k},item:{item_snbt(n, c, s)}}}' for k, (n, c, a, b, sh, s) in enumerate(chunk))
             boxes.append(f'minecraft:{colors[ci % len(colors)]}_shulker_box[custom_name={{text:"{esc(title)}",color:"gold",bold:true,italic:false}},container=[{content}]]')
+    ware = [tool_snbt("tabak", 64), tool_snbt("tabak", 64), tool_snbt("kasik", 16), tool_snbt("catal", 16), tool_snbt("bicak", 16)]
+    content = ",".join(f'{{slot:{k},item:{it}}}' for k, it in enumerate(ware))
+    boxes.insert(0, f'minecraft:white_shulker_box[custom_name={{text:"Sofra Takımı (Tabak, Kaşık, Çatal, Bıçak)",color:"gold",bold:true,italic:false}},container=[{content}]]')
     half = (len(boxes) + 1) // 2
     lines = ["# generated by tools/turk_food.py - do not edit by hand",
              'execute rotated ~ 0 positioned ^1 ^ ^2 run setblock ~ ~ ~ minecraft:chest{CustomName:{text:"Türk Mutfağı 1",color:"gold",bold:true}} replace',
